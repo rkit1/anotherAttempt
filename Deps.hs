@@ -1,91 +1,147 @@
-{-# LANGUAGE ScopedTypeVariables, BangPatterns, GeneralizedNewtypeDeriving, 
-  MultiParamTypeClasses, FlexibleInstances, FunctionalDependencies #-}
+{-# LANGUAGE ScopedTypeVariables, BangPatterns, MultiParamTypeClasses, 
+  FunctionalDependencies, GeneralizedNewtypeDeriving, FlexibleInstances #-}
 module Deps where
-import qualified Data.Map.Strict as M
 import qualified Data.Set as S
-import qualified Data.ByteString.Lazy as LBS
 import Control.Monad.State.Strict
-import Data.Binary
+import Control.Monad.Reader
 import Control.Monad.Trans
+import qualified Data.Map.Strict as M
 
-class (Ord di, Binary di) => DestinationID di
-class (Ord si, Binary si) => SourceID si
-instance DestinationID FilePath
-instance SourceID FilePath
+----
+-- run everything
+----
 
--- | `Data.Binary.encodeFile` reimported for conviniece
-encodeFile :: (Binary a, MonadIO m) => FilePath -> a -> m ()
-encodeFile fp a = liftIO $ Data.Binary.encodeFile fp a
+runEverything
+  :: (Monad m, Ord si, Ord di, Ord t) 
+  => (si -> m t)                            -- ^ Check time
+  -> m t                                    -- ^ Get current time
+  -> (di -> DepRecord si di m a)            -- ^ Process function
+  -> S.Set di                               -- ^ Initial destinations.
+  -> M.Map di (t, S.Set si, S.Set di)       -- ^ Initial memo table
+  -> m (M.Map di (t, S.Set si, S.Set di))   -- ^ Resulting memo table
+runEverything cht cut pr initD initT = runTime cht cut $ runDepDB $ process (runDepRecordAndReport pr) init
 
--- | `Data.Binary.decodeFile` reimported for conviniece
-decodeFile :: (Binary a, MonadIO m) => FilePath -> m a
-decodeFile fp = liftIO $ Data.Binary.decodeFile fp
+----
+-- main loop
+----
 
--- | class for 'TrackMonad'
-class (Monad m, SourceID si, DestinationID di) => MonadTrack si di m | m -> si di where
-  trackSI :: si -> m ()
-  trackDI :: di -> m ()
-
--- | simple monad to keep track of dependencies 
---
--- > process (\ di -> runTrackMonad $ do ... ) ...
---
--- `process` (convenience link)
-newtype TrackMonad si di m a = TrackMonad (StateT (S.Set si, S.Set di) m a)
-  deriving (MonadTrans, Monad, MonadIO)
-
--- | self-explanatory
-runTrackMonad :: (SourceID si, DestinationID di, Monad m) => (TrackMonad si di m a) -> m (S.Set si, S.Set di)
-runTrackMonad (TrackMonad m) = execStateT m (S.empty, S.empty)
-
-instance (SourceID si, DestinationID di, Monad m) => MonadTrack si di (TrackMonad si di m) where 
-  trackSI si = TrackMonad $ modify $ \ (ss, dd) -> (S.insert si ss, dd)
-  trackDI di = TrackMonad $ modify $ \ (ss, dd) -> (ss, S.insert di dd)
-
-
--- | helper for FilePath as DestinationID
-readSouceFP :: (MonadIO m, DestinationID di) => FilePath -> TrackMonad FilePath di m String
-readSouceFP fp = do
-  trackSI fp
-  liftIO $ readFile fp
-
--- | helper for FilePath as SourceID
-saveDestinationFP :: (MonadIO m, SourceID si) => FilePath -> String -> TrackMonad si FilePath m ()
-saveDestinationFP fp str = do
-  trackDI fp
-  liftIO $ writeFile fp str
-
--- | Transofrms `M.Map` produced by `process` into map required by `checkChanges`
-reverseDepMap :: forall a b. (Ord a, Ord b) => M.Map a (S.Set b) -> M.Map b (S.Set a)
-reverseDepMap map = go M.empty $ M.toList map 
-  where 
-    go :: M.Map b (S.Set a) -> [(a, S.Set b)] -> M.Map b (S.Set a)
-    go !resultMap [] = resultMap
-    go !resultMap ((k, v):xs) = go resultMap' xs
-      where
-        resultMap' = foldl (flip $ M.alter alter) resultMap $ S.toList v
-        alter Nothing = Just $ S.singleton k
-        alter (Just a) = Just $ S.insert k a
-      
--- | > oldMap `mergeDepMaps` newMap
-mergeDepMaps :: (DestinationID di, SourceID si, Monad m) 
-  => M.Map di (S.Set si) -> M.Map di (S.Set si) -> M.Map di (S.Set si)
-mergeDepMaps = flip M.union
-
-process :: forall di si m. (DestinationID di, SourceID si, Monad m) 
+process :: (Ord di, Monad m) 
   => (di -> m (S.Set di)) -- ^ Actual processing goes here.
                           -- Return set of destinations found 
                           -- while processing current destination.
   -> (S.Set di)           -- ^ Initial destinations.
   -> m ()
-process process set = go M.empty set
+process process set = go S.empty set
   where
-    go :: M.Map di (S.Set si) -> S.Set di -> m (M.Map di (S.Set si))
     go !done !queue 
-     | Nothing <- S.minView queue = return resultMap
+     | Nothing <- S.minView queue = return ()
      | Just (dst, queueTail) <- S.minView queue = do
-       (ss, ds) <- process dst
-       let queue' = foldl (flip S.insert) queue 
-                      [ x | x <- S.toList ds, not $ x `M.member` resultMap' ]
-           resultMap' = M.insert dst ss resultMap
-       go resultMap' queue'   
+       ds <- process dst
+       let done' = S.insert dst done
+           queue' = queue `S.union` (ds `S.difference` done')
+       go done' queue'   
+
+----
+-- DepRecord
+----
+
+class Monad m => DepRecordMonad m si di | m -> si di where
+  recordSI :: si -> m ()
+  recordDI :: di -> m ()
+
+instance (Monad m, Ord si, Ord di) => DepRecordMonad (DepRecord si di m) si di where
+  recordSI si = DepRecord $ modify $ \ (ss, dd) -> (S.insert si ss, dd)
+  recordDI di = DepRecord $ modify $ \ (ss, dd) -> (ss, S.insert di dd)
+
+newtype DepRecord si di m a = DepRecord (StateT (S.Set si, S.Set di) m a)
+  deriving (Monad, MonadIO, MonadTrans)
+
+runDepRecord :: Monad m => DepRecord si di m a -> m (S.Set si, S.Set di)
+runDepRecord (DepRecord m) = execStateT m (S.empty, S.empty)
+
+runDepRecordAndReport :: (Monad m, Ord si, Ord di, Ord t) 
+  => (di -> DepRecord si di m a) 
+  -> di 
+  -> DepDB si di t (Time si t m) (S.Set di)
+runDepRecordAndReport f di = do
+  deps <- lookupDeps di
+  let doit = do 
+        (ss, dd) <- lift $ lift $ runDepRecord (f di)
+        t <- curTime 
+        recordDeps di t ss dd
+        return dd
+  case deps of
+    Nothing -> doit
+    Just (t, ss, dd) -> do
+      c <- checkForChanges t ss
+      if c then doit else return dd
+
+----
+-- DepDB
+----
+
+newtype DepDB si di t m a = DepDB (StateT (M.Map di (t, S.Set si, S.Set di)) m a)
+  deriving (Monad, MonadIO, MonadTrans)
+
+runDepDB :: (Monad m, Ord si, Ord di) => DepDB si di t m a -> m (M.Map di (t, S.Set si, S.Set di))
+runDepDB (DepDB m) = execStateT m M.empty
+
+class Monad m => DepDBMonad m si di t | m -> si di t where 
+  recordDeps :: di -> t -> S.Set si -> S.Set di -> m ()
+  lookupDeps :: di -> m (Maybe (t, S.Set si, S.Set di))
+
+instance (Monad m, Ord si, Ord di) => DepDBMonad (DepDB si di t m) si di t where
+  recordDeps di t ss dd = DepDB $ modify $ M.insert di (t, ss, dd)
+  lookupDeps di = DepDB $ gets $ M.lookup di
+
+----
+-- Time
+----
+
+class Monad m => TimeMonad m si t | m -> si t where
+  checkTime :: si -> m t
+  curTime :: m t
+
+instance TimeMonad m si t => TimeMonad (DepDB si di t m) si t where
+  checkTime si = lift $ checkTime si
+  curTime = lift $ curTime
+
+instance (Monad m, Ord si) => TimeMonad (Time si t m) si t where
+  curTime = Time $ gets curTime_ >>= \ x -> lift x
+  checkTime si = Time $ do
+    x <- get 
+    case M.lookup si (memoMap x) of
+      Just t -> return t
+      Nothing -> do
+        t <- lift $ checkTime_ x si
+        put x{memoMap = M.insert si t $ memoMap x}
+        return t
+        
+
+newtype Time si t m a = Time (StateT (TimeState si t m) m a)
+  deriving (Monad, MonadIO)
+
+runTime :: (Monad m, Ord si) => (si -> m t) -> (m t) -> Time si t m a -> m a
+runTime cht cut (Time m) = evalStateT m st
+  where st = TimeState
+             { memoMap = M.empty
+             , checkTime_ = cht
+             , curTime_ = cut }
+
+checkForChanges :: (Ord t, TimeMonad m si t) => t -> S.Set si -> m Bool
+checkForChanges t ss = do
+  go $ S.toList ss
+  where 
+    go [] = return False
+    go (x:xs) = do
+      st <- checkTime x
+      if st > t then return True else go xs
+      
+
+instance MonadTrans (Time si t) where
+  lift m = Time $ lift m
+
+data TimeState si t m = TimeState
+  { memoMap :: !(M.Map si t)
+  , checkTime_ :: si -> m t
+  , curTime_ :: m t }
