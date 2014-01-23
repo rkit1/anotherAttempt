@@ -1,0 +1,26 @@
+Name:                aa
+Version:             0.1
+Synopsis:            aa
+Description:
+  aa
+License:             OtherLicense
+License-file:        LICENSE
+Author:              Victor Gorokhov
+Maintainer:          me@rkit.pp.ru
+Category:            Language
+Build-type:          Simple
+Cabal-version:       >=1.4
+--Extra-Source-Files:  example/Example.hs
+
+--Executable FileTemplate
+--  Main-is:           FileTemplate.hs
+--  Build-depends:     base >= 4, data-accessor-template >= 0.2, data-accessor >= 0.2, data-accessor-mtl >= 0.2,
+--                     parsec >= 3, mtl >= 2, Library, containers, json, directory >= 1, MaybeT, template-haskell, 
+--                     deepseq, bytestring, cryptohash, binary, filepath, old-time, transformers, text, blaze-builder,
+--                     xmlhtml, attoparsec, utf8-string, process, hint, peggy, safecopy
+--  hs-source-dirs:    .
+
+Library 
+  Build-Depends: peggy, Library, base, data-accessor, data-accessor-template, data-accessor-mtl, json, xmlhtml, text, blaze-builder, utf8-string
+  hs-source-dirs:    .
+

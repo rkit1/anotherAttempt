@@ -9,7 +9,7 @@ import PlainTemplate.Parser
 import PlainTemplate.Variable
 import Head
 import PlainTemplate.Listing
-import PlainTemplate.NeedRebuild
+--import PlainTemplate.NeedRebuild
 import qualified Data.Accessor.Monad.MTL.State as A
 import qualified Data.Set as S
 import PeopleDB

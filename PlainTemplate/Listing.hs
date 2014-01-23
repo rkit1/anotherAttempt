@@ -5,7 +5,7 @@ import Library
 import System.Time
 import qualified Data.Map as M
 import Data.Binary
-import qualified Store as S
+--import qualified Store as S
 
 data Date 
   = Date
