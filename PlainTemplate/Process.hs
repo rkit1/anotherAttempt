@@ -4,7 +4,6 @@ module PlainTemplate.Process where
 import PlainTemplate.Variable
 import PlainTemplate.Parser
 import PlainTemplate.Monad
-import PlainTemplate.NeedRebuild
 import Head
 import Library
 import Library.System
@@ -17,7 +16,6 @@ import qualified Data.Set as S
 import System.Process
 import System.FilePath
 import qualified Text.Parsec as P
-import Cache
 
 callRTPL :: FilePath -> M String
 callRTPL path = do

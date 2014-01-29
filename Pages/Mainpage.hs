@@ -13,6 +13,11 @@ import PlainTemplate.Listing
 import qualified Data.Accessor.Monad.MTL.State as A
 import qualified Data.Set as S
 import PeopleDB
+import Deps
+
+readHead = undefined
+isNeedRebuild = undefined
+updateRebuildInfo = undefined
 
 type Builder a = [a] -> [a]
 
@@ -64,21 +69,19 @@ mkPage MainPage{..} = do
   where 
     mkN str = mkVariables [ ("content", Variable str) ]
 
-runMP :: FilePath -> [FilePath] -> M MainPage -> IO ()
+runMP :: (MonadIO m, DepRecordMonad m FilePath di) =>
+  FilePath -> [FilePath] -> M MainPage -> m ()
 runMP fp list m = do
-  x <- isNeedRebuild fp list
-  case x of
-    False -> printf "skipping %s\n" fp
-    True -> do
-      printf "processing %s ... " fp
-      hFlush stdout
-      r <- runM $ do
-        a <- mkPage =<< m
-        deps <- A.get depends
-        liftIO $ do
-          writeFileE utf8 fp a
-          updateRebuildInfo fp list $ S.toList deps
-      error . show <++> const (putStrLn "done") $ r
+  r <- liftIO $ runM $ do
+    a <- mkPage =<< m
+    deps <- A.get depends
+    liftIO $ writeFileE utf8 fp a
+    return deps
+  case r of
+    Left err -> error $ show r
+    Right deps -> do
+      mapM_ recordSI (S.toList deps)
+--      mapM_ recordSI list
 
 
 commonLeft = 
@@ -174,7 +177,7 @@ data PageSpec = PageSpec
   , pMpRight :: [Block] }
 
 
-
+{-
 page PageSpec 
   { pTitle=title
   , pListing=listing
@@ -204,7 +207,8 @@ page PageSpec
         mpRight = [archList]
     mpContent <- liftIO $ mapM readHead list
     return MainPage {..}
-
+-}
+page = undefined
 
 wrapP :: String -> String
 wrapP = printf "<p>%s</p>"
@@ -222,6 +226,7 @@ personPath = printf "/people/%s.htm"
 
 personLink :: String -> String 
 personLink fn = printf "<a href='%s'>%s</a>" (personPath fn) fn
+
 
 people = do
   ppl <- listPeople

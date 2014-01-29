@@ -25,13 +25,13 @@ readHead path = do
   forceReadFileE utf8 fp
 -}
 
-readHead :: String -> IO String
-readHead path = do
-  c <- doesFileExist ("x:/" ++ path ++ "/~head.htm")
-  if c then forceReadFileE utf8 ("x:/" ++ path ++ "/~head.htm")
-       else cacheOP (processHeadFile2 (path ++ "/~head.htm.src"))
-                    (forceReadFileE utf8 . ("x:/"++))
-                    (path ++ "/~head.htm.src")
+--readHead :: String -> IO String
+--readHead path = do
+--  c <- doesFileExist ("x:/" ++ path ++ "/~head.htm")
+--  if c then forceReadFileE utf8 ("x:/" ++ path ++ "/~head.htm")
+--       else cacheOP (processHeadFile2 (path ++ "/~head.htm.src"))
+--                    (forceReadFileE utf8 . ("x:/"++))
+--                    (path ++ "/~head.htm.src")
   
 readWidgetHead :: String -> IO String 
 readWidgetHead path = do

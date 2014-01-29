@@ -19,7 +19,7 @@ runEverything
   -> S.Set di                               -- ^ Initial destinations.
   -> M.Map di (t, S.Set si, S.Set di)       -- ^ Initial memo table
   -> m (M.Map di (t, S.Set si, S.Set di))   -- ^ Resulting memo table
-runEverything cht cut pr initD initT = runTime cht cut $ runDepDB $ process (runDepRecordAndReport pr) init
+runEverything cht cut pr initD initT = runTime cht cut $ runDepDB $ process (runDepRecordAndReport pr) initD
 
 ----
 -- main loop
