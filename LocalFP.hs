@@ -1,5 +1,5 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
-module SourceIdentifier where
+module LocalFP where
 import qualified Data.Text as T
 import Control.Monad.Reader
 

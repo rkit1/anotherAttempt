@@ -81,7 +81,8 @@ runMP fp list m = do
     Left err -> error $ show r
     Right deps -> do
       mapM_ recordSI (S.toList deps)
---      mapM_ recordSI list
+      mapM_ recordSI list
+
 
 
 commonLeft = 

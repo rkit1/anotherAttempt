@@ -16,7 +16,10 @@ import Path
 import Debug.Trace
 import System.FilePath as FP
 
+-- путь до директории
 processHead path = withHead onNodes path
+
+-- полный путь
 processHead2 path = withHead2 onNodes path
 
 withHead onNodes path = do
@@ -31,6 +34,7 @@ withHead2 onNodes path = do
     let Right HtmlDocument{..} = parseHTML path s
     onNodes docContent
 
+processHeadFile :: FilePath -> IO ()
 processHeadFile fp' = do
   let fp = fixPath fp'
   (_,out) <- runMT M.empty (M.fromList [imgsTag]) $ processHead fp
@@ -38,6 +42,7 @@ processHeadFile fp' = do
   BZ.toByteStringIO (BS.hPutStr h) $ nodesToBLDR out
   hClose h
 
+processHeadFile2 :: FilePath -> FilePath -> IO ()
 processHeadFile2 sfp fp = do
   (_,out) <- runMT M.empty (M.fromList [imgsTag]) $ processHead2 sfp
   h <- openBinaryFile ("x:/" ++ fp) WriteMode

@@ -50,12 +50,12 @@ processTemplate = wide $ return <++> p
 
 wide m l = liftM concat $ mapM m l
 
-processSet :: [Either String Tag] -> M [Variables]
+processSet :: [Either String Tag] -> M [Dictionary]
 processSet x = wide (none <++> p) x
   where
     item b = do
       x <- processVariableSet b
-      return [Variables $ M.fromList x]
+      return [Dictionary $ M.fromList x]
     p = setVarTag ( \ a b -> setVar a b >> return [] )
       $ stepDown
       $ includeTag processSet 
@@ -75,7 +75,7 @@ none = const $ return []
 unexpectedTag :: Tag -> M a
 unexpectedTag (Tag pos name attrs body) = throwError $ "unexpected tag " ++ name
 
-foreachTag :: ( Body -> Variables -> M [a] ) -> (Tag -> M [a]) -> Tag -> M [a]
+foreachTag :: ( Body -> Dictionary -> M [a] ) -> (Tag -> M [a]) -> Tag -> M [a]
 foreachTag success cont (Tag pos "foreach" attrs body) = do
   let (var:c) = attrs
       count = case c of

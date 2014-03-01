@@ -7,6 +7,9 @@ import Control.Monad.Reader
 import Control.Monad.Trans
 import qualified Data.Map.Strict as M
 
+-- di = destination identifier site.com/a/b
+-- si = source identifier /home/user/a/b
+
 ----
 -- run everything
 ----

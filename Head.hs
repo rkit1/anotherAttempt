@@ -1,4 +1,4 @@
-{-# LANGUAGE RecordWildCards, ViewPatterns #-}
+{-# LANGUAGE RecordWildCards, ViewPatterns, FlexibleContexts #-}
 module Head where
 import Library.System
 --import Config
@@ -10,6 +10,8 @@ import XmlTemplate.Head
 import XmlTemplate.WidgetHead 
 import Library
 import Debug.Trace
+import Deps
+import PlainTemplate.Monad
 
 prefix = "x:"
 
@@ -17,13 +19,23 @@ intro path = x ++ printf "<?$d=\"%s\";?>" path
   where
     x = unsafePerformIO (readFileE utf8 "x:/~templates/intro.php")
 
-{-
-readHead :: String -> IO String
-readHead path = do
+readHeadM :: FilePath -> M String
+readHeadM path = do
+  recordDepend path
+  readHead path
+
+
+readHeadAndRecordSI :: (MonadIO m, DepRecordMonad m FilePath di) => FilePath -> m String
+readHeadAndRecordSI path = do
+  recordSI (prefix ++ path ++ "/~head.htm")
+  readHead path
+
+readHead :: MonadIO m => String -> m String
+readHead path = liftIO $ do
   let fp = prefix ++ path ++ "/~head.htm"
   whenNotM (doesFileExist fp) $ processHeadFile (prefix ++ path)
   forceReadFileE utf8 fp
--}
+
 
 --readHead :: String -> IO String
 --readHead path = do

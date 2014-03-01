@@ -21,7 +21,7 @@ newtype ME m a = ME { runME :: m (Either E a) }
 data E = E (SourcePos,SourcePos) String deriving Show
 
 data StackElem = StackElem
-  { context__ :: Variables
+  { context__ :: Dictionary
   , tag__ :: Tag
   } 
 
@@ -70,22 +70,22 @@ instance (Error a, MonadError a (ME m), MonadIO m) => MonadIO (ME m) where
 
 lookupVar :: String -> M Variable
 lookupVar str = do
-  Variables x <- A.get context
+  Dictionary x <- A.get context
   case M.lookup str x of
     Just a -> return a
     Nothing -> throwError $ strMsg $ "Variable not found: " ++ str
 
 setVar :: String -> Variable -> M ()
-setVar nm var = context %: \ (Variables a) -> Variables $ M.insert nm var a
+setVar nm var = context %: \ (Dictionary a) -> Dictionary $ M.insert nm var a
 
-updateVars :: Variables -> M ()
-updateVars (Variables a) = context %: \ (Variables b) -> Variables $ M.union a b
+updateVars :: Dictionary -> M ()
+updateVars (Dictionary a) = context %: \ (Dictionary b) -> Dictionary $ M.union a b
 
 runM :: M a -> IO (Either E a)
 runM m = evalStateT ( runME m ) $ 
   S { stack_ = 
       [ StackElem
-        { context__ = Variables M.empty
+        { context__ = Dictionary M.empty
         , tag__ = (undefined <++> id) $ head $ (undefined <++> id ) $ runP body () "no location" "[dummytag]"
         } ]
     , depends_ = S.empty }

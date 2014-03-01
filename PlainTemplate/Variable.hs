@@ -1,10 +1,10 @@
-{-# LANGUAGE FlexibleInstances, ExistentialQuantification, DeriveDataTypeable, ScopedTypeVariables, PatternGuards#-}
+{-# LANGUAGE FlexibleInstances, ExistentialQuantification, DeriveDataTypeable, ScopedTypeVariables, PatternGuards #-}
 module PlainTemplate.Variable 
     ( Template(..)
     , Variable(..)
     , mcast
-    , Variables(..)
-    , mkVariables
+    , Dictionary(..)
+    , mkDictionary
     , Typeable(..)
     , compareStr
     ) where
@@ -32,8 +32,8 @@ newtype Template = Template Body
 data Variable = forall var. Typeable var => Variable var
   deriving Typeable
 
-newtype Variables = Variables (M.Map String Variable)
+newtype Dictionary = Dictionary (M.Map String Variable)
   deriving Typeable
 
-mkVariables :: [(String, Variable)] -> Variables
-mkVariables a = Variables $ M.fromList a
+mkDictionary :: [(String, Variable)] -> Dictionary
+mkDictionary a = Dictionary $ M.fromList a
