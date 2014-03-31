@@ -1,7 +1,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 module Pages.Mainpage2 where
 import Config.Parser (parseConfigFile)
-import LocalFP
+import RelativeFP
 import qualified Data.Map as M
 import Data.Char
 import Head
@@ -11,9 +11,13 @@ import Deps
 import qualified Data.Accessor.Monad.MTL.State as A
 import qualified Data.Set as S
 import qualified PlainTemplate.Variable as V
+import PlainTemplate.Listing
 import PlainTemplate.Monad
 import PlainTemplate.Process
 import PlainTemplate.Variable
+
+
+
 
 (!) :: Monad m => M.Map String a -> String -> m a
 a ! b = case M.lookup b a of Nothing -> error ("key not found: " ++ b)
@@ -41,10 +45,9 @@ runMainPage page configPath outPath = withCurrent configPath $ do
     callRTPL "/~templates/mainpage1.rtpl"
 --saveTo outPath str
 --recordDI
+  undefined
 
-
-runMAndRecordSI :: (MonadIO m, DepRecordMonad m FilePath di) =>
-     M a -> m a
+runMAndRecordSI :: (MonadIO m, DepRecordMonad m FilePath di) => M a -> m a
 runMAndRecordSI m = do
   Right (a, deps) <- liftIO $ runM $ do
                        a <- m
@@ -71,4 +74,5 @@ processColumn str =
       "!remember" -> undefined -}
 
 -- String -> M V.Dictionary
+
 
