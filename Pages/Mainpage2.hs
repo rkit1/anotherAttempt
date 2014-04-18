@@ -1,7 +1,9 @@
 {-# LANGUAGE FlexibleContexts #-}
 module Pages.Mainpage2 where
 import Config.Parser (parseConfigFile)
-import RelativeFP
+import Path.Destination
+import Path.Source
+import Path
 import qualified Data.Map as M
 import Data.Char
 import Head
@@ -15,7 +17,7 @@ import PlainTemplate.Listing
 import PlainTemplate.Monad
 import PlainTemplate.Process
 import PlainTemplate.Variable
-
+import LinkExtractor
 
 
 
@@ -43,7 +45,8 @@ runMainPage page configPath outPath = withCurrent configPath $ do
                       str <- readHeadM x
                       return $ mkDictionary [ ("content", Variable str) ] 
     callRTPL "/~templates/mainpage1.rtpl"
---saveTo outPath str
+  forM_ (
+  saveTo outPath str
 --recordDI
   undefined
 

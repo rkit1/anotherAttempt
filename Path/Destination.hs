@@ -2,12 +2,24 @@
 module Path.Destination where
 import Control.Monad.Trans.Reader
 import Control.Monad.Trans
+import System.IO
+
+-- FIXME deal with absoultes
 
 data DestinationPath = DestinationPath [String]
   deriving Show
 
+toDestinationPath :: String -> Either String DestinationPath
+toDestinationPath str = Right $ DestinationPath $ go str id
+  where
+    go ('/':xs) c = (c []) : go xs id
+    go (x:xs) c = go xs (c . (x:))
+    go [] c = [c []]
+  
+
 class DestMonad m where
   destToFilePath :: DestinationPath -> m FilePath
+  destToAbsolute :: DestinationPath -> m DestinationPath
 
 
 newtype DestT m a 
@@ -15,11 +27,18 @@ newtype DestT m a
     deriving (Monad, MonadTrans, MonadIO)
 
 instance Monad m => DestMonad (DestT m) where
-  destToFilePath (DestinationPath p) = DestT $ do
+  destToFilePath p = do
+    DestinationPath a <- destToAbsolute p
+    return $ concat a
+  destToAbsolute (DestinationPath p) = DestT $ do
     DestinationPath basePath <- ask
-    return $ concat $ normalizePath $ basePath ++ p
+    return $ DestinationPath $ normalizePath $ basePath ++ p
 
-
+saveTo :: (MonadIO m, DestMonad m) => DestinationPath -> String -> m ()
+saveTo dfp str = do
+  fp <- destToFilePath dfp
+  liftIO $ writeFile fp str
+  
 
 -- | только на абсолютных путях
 normalizePath :: [String] -> [String]
