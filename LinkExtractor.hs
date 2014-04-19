@@ -1,4 +1,4 @@
-{-# LANGUAGE ImplicitParams #-}
+{-# LANGUAGE ImplicitParams, CPP #-}
 module LinkExtractor where
 import Path.Destination
 import Path
@@ -8,6 +8,7 @@ import Control.Effects.Error
 import Control.Effects.Writer
 import Control.Effects
 import Control.Monad
+import Network.URL
 
 extractLinkStrings :: String -> [Either String String]
 extractLinkStrings str = parseTags str >>= f
@@ -24,16 +25,25 @@ extractLinkStrings str = parseTags str >>= f
       , "script" % "src" ]
     (%) = (,)
 
--- FIXME filter absolute 
+
 extractLinks ::
   ( ?warnings :: Effect ([String], r) m1
   , AutoLift ([String], r) m1 m
   ) =>
-    String -> m [DestinationPath]
+    String -> m [URL]
 extractLinks str = liftM concat $ forM (extractLinkStrings str) $ \ a -> case a of
     Left warn -> tell ?warnings ["HTML PARSE: " ++ warn] >> return []
-    Right line 
-      | 
-      | otherwis -> case toDestinationPath line of
-        Left err -> tell ?warnings ["LINK PARSE: " ++ err] >> return []
-        Right res -> return [res]
+    Right line -> case importURL  line of
+      Nothing -> tell ?warnings ["importURL ERROR: \"" ++ line ++ "\""] >> return []
+      Just url -> return [url]
+
+
+#ifdef dev
+test = do
+  x <- readFile "x:/index.htm"
+  print $ run $ with writer $ \ w -> 
+      let ?warnings = w in extractLinks x
+    
+  
+#endif
+

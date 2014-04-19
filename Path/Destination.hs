@@ -1,16 +1,20 @@
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving, RecordWildCards #-}
 module Path.Destination where
 import Control.Monad.Trans.Reader
 import Control.Monad.Trans
 import System.IO
+import Network.URL
 
--- FIXME deal with absoultes
 
 data DestinationPath = DestinationPath [String]
   deriving Show
 
-toDestinationPath :: String -> Either String DestinationPath
-toDestinationPath str = Right $ DestinationPath $ go str id
+
+-- FIXME deal with absoultes
+uRLtoDestinationPath :: URL -> Either String DestinationPath
+uRLtoDestinationPath u@URL{..} 
+  | Absolute _ <- url_type = Left $ "uRLtoDestinationPath: absolute URL: \""++ exportURL u  ++"\""
+  | otherwise  = Right $ DestinationPath $ go url_path id
   where
     go ('/':xs) c = (c []) : go xs id
     go (x:xs) c = go xs (c . (x:))
