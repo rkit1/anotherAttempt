@@ -1,41 +1,94 @@
+{-# LANGUAGE OverloadedStrings, CPP#-}
 module Path where
-import Path.Destination
-import Path.Source
+import qualified Data.Text as T
+import Data.String
+import SiteGen.IO
+import SiteGen.Deps
+#ifdef dev
+import Control.Monad
+#endif
 
--- LEGACY
-import Text.Parsec hiding (State)
-import Library
 
-class Path a where
-  isAbsolute :: a -> Bool
-  rootPath :: a
-  isRoot :: a -> Bool
-  (</>) :: a -> a -> a
-  goUp :: a -> a
+-- global = "":xs
+-- relative = x:xs
+
+------
+class Path p where
+    relativeTo :: p -> p -> p
+
+
+------
+newtype DestinationPath = DP [T.Text] 
+    deriving (Show)
 
 instance Path DestinationPath where
-  isAbsolute (DestinationPath ("":p)) = True
-  isAbsolute _ = False
-  rootPath = DestinationPath ["",""]
-  isRoot (DestinationPath ["",""]) = True
-  isRoot _ = False
-  (DestinationPath a) </> (DestinationPath b) = (DestinationPath $ a ++ b)
-  goUp (DestinationPath []) = (DestinationPath [])
-  goUp (DestinationPath a) = (DestinationPath $ init a)
+    DP a `relativeTo` DP b = DP $ normalizePath $ a `pathRelativeTo` b
+
+instance IsString DestinationPath where
+    fromString str = DP $ readPath str
+    
+------
+newtype SourcePath = SP [T.Text]
+    deriving (Show)
+
+instance Path SourcePath where
+    SP a `relativeTo` SP b = SP $ normalizePath $ b ++ a
+
+instance IsString SourcePath where
+    fromString str = SP $ readPath str
 
 
---instance Path SourcePath where
+------
+readPath :: String -> [T.Text]
+readPath "" = [".", ""]
+readPath "." = [".", ""]
+readPath ".." = ["..", ""]
+readPath str = normalizePath $ T.splitOn "/" $ T.pack str
+
+normalizePath :: [T.Text] -> [T.Text]
+normalizePath ls = case ls of
+  ".":"..":xs  -> ".":"..":normalizePath xs
+  "..":"..":xs -> "..":"..":normalizePath xs
+  x:"..":xs    -> normalizePath xs
+  x:xs         -> x:normalizePath xs
+  []           -> []
 
 
--- LEGACY
-fixPath :: String -> String
-fixPath str | Right r <- t = r
-            | Left err <- t = error $ printf "fixPath: trying to process %s. Error is %s" (show err) str
-  where 
-    t = parse p "" str 
-    p = msum
-      [ try (oneOf "xX" >> char ':') >> win
-      , unix ]
-    win = many1 (slash `mplus` anyChar)
-    slash = char '\\' >> return '/'
-    unix = many1 anyChar
+pathRelativeTo :: [T.Text] -> [T.Text] -> [T.Text]
+pathRelativeTo a@("":_) _ = a
+pathRelativeTo (".":a) b = init b ++ a
+pathRelativeTo a b = init b ++ a
+
+toFilePath :: FilePath -> [T.Text] -> FilePath
+toFilePath sfp xs = sfp ++ concat [ '/':T.unpack x | x <- clear xs ]
+  where
+    xs' = clear xs
+    clear (".":xs) = clear xs
+    clear ("..":xs) = clear xs
+    clear ("":xs) = clear xs
+    clear xs = xs
+
+
+
+#ifdef dev
+
+
+test = forM_ [ "."
+             , ""
+             , "." `relativeTo` "/home/index.htm"
+             , "." `relativeTo` "/home/index.htm/"
+             , ".." `relativeTo` "/home/index.htm/"
+             , ".." `relativeTo` "/home/index.htm"
+             , ".." `relativeTo` ".." 
+             , "/"
+             , "/home"
+             , "home/"
+             ] $ \ x@(DP y) -> do
+          print x
+          putStrLn $ toFilePath "x:" y
+
+
+
+#endif
+
+
