@@ -1,6 +1,6 @@
 {-# LANGUAGE ScopedTypeVariables, BangPatterns, MultiParamTypeClasses, 
   FunctionalDependencies, GeneralizedNewtypeDeriving, FlexibleInstances #-}
-module Deps where
+module SiteGen.Deps where
 import qualified Data.Set as S
 import Control.Monad.State.Strict
 import Control.Monad.Reader

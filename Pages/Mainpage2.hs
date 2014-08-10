@@ -1,15 +1,17 @@
 {-# LANGUAGE FlexibleContexts #-}
 module Pages.Mainpage2 where
 import Config.Parser (parseConfigFile)
-import Path.Destination
-import Path.Source
+--import Path.Destination
+--import Path.Source
 import Path
+import Data.String
 import qualified Data.Map as M
 import Data.Char
-import Head
+import Control.Monad
+import XmlTemplate.Head2
 import Control.Monad.Writer
 import Library
-import Deps
+import SiteGen.Deps
 import qualified Data.Accessor.Monad.MTL.State as A
 import qualified Data.Set as S
 import qualified PlainTemplate.Variable as V
@@ -17,7 +19,11 @@ import PlainTemplate.Listing
 import PlainTemplate.Monad
 import PlainTemplate.Process
 import PlainTemplate.Variable
-import LinkExtractor
+import SiteGen.LinkExtractor
+import SiteGen.Deps
+import SiteGen.IO as IO
+import Config.Parser
+import Config.Site
 
 
 
@@ -25,40 +31,48 @@ import LinkExtractor
 a ! b = case M.lookup b a of Nothing -> error ("key not found: " ++ b)
                              Just a -> return $! a
 
-{-
-runMP :: FilePath 
-      -> FilePath 
-      -> -}
-runMainPage page configPath outPath = withCurrent configPath $ do
-  Right cfg -- FIXME
-      <- parseConfigFile =<< toFilePath configPath 
+
+
+runMainPage
+  :: (IsString di, SiteConfig m, DepRecordMonad m SourcePath di,
+      MonadSiteIO SourcePath di m) =>
+     Int -> SourcePath -> di -> m ()
+runMainPage pageNumber configPath outPath = {- withCurrent configPath $ -} do
+  Right cfg <- parseConfig `liftM` IO.readString configPath
+
   mid' <- cfg ! "mid"
   let mid = filter (not . all isSpace) $ lines mid'
-      grouped = groupByMonths mid
-      myChunk | Nothing <- page = take 50 $ mid
-              | Just x <- page = undefined
+      myChunk = take 50 $ drop (50*pageNumber) mid
+
+  news <- forM myChunk $ \ x -> do
+    x' <- readHead $ SP $ readPath x
+    return $ mkDictionary [ ("content", Variable x' ) ]  
+
   str <- runMAndRecordSI $ do
     "title" $=. cfg ! "title"
     "leftcolumn" $=. processColumn =<< cfg ! "left"
     "rightcolumn" $=. processColumn =<< cfg ! "right"
-    "news" $=. flip mapM myChunk $ \ x -> do
-                      str <- readHeadM x
-                      return $ mkDictionary [ ("content", Variable str) ] 
+    "news" $=. return news
     callRTPL "/~templates/mainpage1.rtpl"
-  forM_ (
-  saveTo outPath str
---recordDI
-  undefined
 
-runMAndRecordSI :: (MonadIO m, DepRecordMonad m FilePath di) => M a -> m a
+  links <- filterLinks $ extractLinkStrings str
+  forM_ links $ \ l -> recordDI $ fromString l
+
+  writeString outPath str
+
+
+
+
+
+runMAndRecordSI :: (MonadIO m, DepRecordMonad m SourcePath di) => M a -> m a
 runMAndRecordSI m = do
   Right (a, deps) <- liftIO $ runM $ do
                        a <- m
                        deps <- A.get depends
                        return (a, deps)
-  forM_ (S.toList deps) recordSI
+  forM_ (S.toList deps) $ recordSI . fromString
   return a
-  
+
 
 processColumn :: String -> M String
 processColumn str = 

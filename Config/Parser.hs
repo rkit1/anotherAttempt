@@ -9,6 +9,9 @@ parseConfigFile fp = liftIO $ do
   a <- parseFile configParser fp
   return $ fmap linesToMap a
 
+parseConfig :: String -> Either ParseError (M.Map String String)
+parseConfig str = fmap linesToMap $ parseString configParser "config string" str
+
 linesToMap :: [Line] -> M.Map String String
 linesToMap ls = go M.empty ls
   where
