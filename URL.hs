@@ -1,5 +1,8 @@
-{-# LANGUAGE GeneralizedNewtypeDeriving, TemplateHaskell, DeriveDataTypeable, QuasiQuotes, FlexibleContexts, RecordWildCards, CPP #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving, TemplateHaskell, DeriveDataTypeable, QuasiQuotes, FlexibleContexts, RecordWildCards #-}
 module URL where
+import Data.Typeable
+import Data.SafeCopy
+import Control.Monad.Error
 import Data.Maybe
 import Text.Peggy
 import qualified Data.Text as T
@@ -8,57 +11,47 @@ import Control.Monad.Error
 import Data.String
 import Text.Printf
 
-{-
-data URL = URL
-  { host :: Maybe HostPart
-  , resource :: ResourcePart }
+-----
+-- Инстансы isString
+-- Тесты
+-----
 
-data HostPart
-  { scheme :: T.Text
-  , auth :: Maybe T.Text
-  , host :: T.Text
-  , port :: Maybe Int }
 
-data ResourcePart
-  { path :: T.Text
-  , query :: T.Text
-  , fragment :: T.Text }
--}
-data URL = URL
-  { scheme :: String
-  , auth :: String
-  , host :: String
-  , port :: Int
-  , path :: String
+newtype LocalResourceURL = LocalResourceURL { getSrcFilePath :: FilePath } 
+
+data RelativeHTTPURL = RelativeHTTPURL
+  { path :: String
   , query :: String
   , fragment :: String }
---  deriving Show
+  deriving Show
+$(deriveSafeCopy 0 'base ''RelativeHTTPURL)
+  
+data HTTPURL = HTTPURL
+  { host :: String
+  , auth :: (String, String)
+  , port :: Int
+  , relativePart :: RelativeHTTPURL }
+  deriving Show
+$(deriveSafeCopy 0 'base ''HTTPURL)
 
-instance Show URL where
-  show u = printf "URL <%s>" $ showURL u
+newtype StoreURL = StoreURL String deriving (Ord, Eq, Typeable, Show)
+$(deriveSafeCopy 0 'base ''StoreURL)
+  
+data UnknownURL = UnknownURL
+  { scheme :: String
+  , content :: String }
 
+data URL
+  = RelativeHTTPURL_ RelativeHTTPURL
+  | HTTPURL_ HTTPURL
+  | StoreURL_ StoreURL
+  | UnknownURL_ UnknownURL
 
--- FIXME encoding
-showURL :: URL -> String
-showURL URL{..} = outURL
-  where 
-    f "" x = ""
-    f _ x = x
-    auth' = f auth (auth ++ "@")
-    port' | port == 0 = ""
-          | otherwise = ':':show port
-    query' = f query ('?':query)
-    fragment' = f fragment ('#':fragment)
-    outURL | host == "" = printf "%s%s%s" path query' fragment'
-           | otherwise = printf "%s://%s%s%s%s%s%s" scheme auth' host port' path query' fragment'
-
-urlRelativeTo :: URL -> URL -> URL
-urlRelativeTo rel@URL{..} abs@URL{path = oldPath} 
-  | scheme == "" =
-    abs { path = path `pathRelativeTo` oldPath
-        , query = query
-        , fragment = fragment }
-  | otherwise = rel
+urlRelativeTo :: RelativeHTTPURL -> HTTPURL -> HTTPURL
+urlRelativeTo rel@RelativeHTTPURL{..} abs@HTTPURL{..} = abs{relativePart = newRel}
+  where
+    RelativeHTTPURL {path = oldPath} = relativePart
+    newRel = rel{path = path `pathRelativeTo` oldPath}
 
 pathRelativeTo newPath@('/':_) _ = newPath
 pathRelativeTo newPath oldPath = trimEnding ++ newPath
@@ -72,13 +65,21 @@ parseURLText :: MonadError String m => T.Text -> m URL
 parseURLText t = parseURL $ T.unpack t
 
 parseURL :: MonadError String m => String -> m URL
-parseURL s = case parseString uRLP (printf "parseURL %s" s) s of
+parseURL s = case parseString uRLP "" s of
   Left err -> throwError $ show err
   Right res -> return res
 
+----
+-- isString
+---- 
 
-instance IsString URL where
-  fromString s = case parseString uRLP (printf "fromString %s" s) s of
+instance IsString RelativeHTTPURL where
+  fromString s = case parseString relativeURLP (printf "<fromString %s>" s) s of
+    Left err -> error $ show err
+    Right res -> res
+
+instance IsString HTTPURL where
+  fromString s = case parseString absoluteURLP (printf "<fromString %s>" s) s of
     Left err -> error $ show err
     Right res -> res
 
@@ -86,16 +87,26 @@ instance IsString URL where
 -- Parsing
 ----
 
-fm x Nothing = x
-fm x (Just a) = a
+uRLHelper scheme auth host port path query fragment =
+  HTTPURL
+    { host = host
+    , port = fromMaybe 80 port
+    , auth = fromMaybe ("","") auth
+    , relativePart = relativeURLHelper path query fragment }
+
+relativeURLHelper path query fragment = 
+  RelativeHTTPURL
+    { path = path
+    , query = fromMaybe "" query
+    , fragment = fromMaybe "" fragment }
 
 [peggy|
 
 schemeP :: String
   = [a-zA-Z] [a-zA-Z0-9+-.]* { $1 : $2 }
 
-authP :: String
-  = [^@]+
+authP :: (String, String)
+  = [^@:/?]+ (':' [^@]+)? { ($1, fromMaybe "" $2) }
 
 hostP :: String
   = [^:/?]+
@@ -113,16 +124,19 @@ fragmentP :: String
   = .*
 
 uRLP :: URL
-  = absoluteURLP 
-  / relativeURLP 
+  = absoluteURLP { HTTPURL_ $1 }
+  / relativeURLP { RelativeHTTPURL_ $1 }
+  / unknownURLP { UnknownURL_ $1 }
 
-
-relativeURLP :: URL
-  = pathP ('?' queryP)? ('#' fragmentP)? { URL "" "" "" 0 $1 (fm "" $2) (fm "" $3) } 
+relativeURLP :: RelativeHTTPURL
+  = pathP ('?' queryP)? ('#' fragmentP)? { relativeURLHelper $1 $2 $3 } 
                      
-absoluteURLP :: URL
+absoluteURLP :: HTTPURL
   = schemeP '://' (authP '@')? hostP (':' portP)? pathP ('?' queryP)? ('#' fragmentP)?
-    { URL $1 (fm "" $2) $3 (fm 0 $4) $5 (fm "" $6) (fm "" $7) }
+    { uRLHelper $1 $2 $3 $4 $5 $6 $7 }
+
+unknownURLP :: UnknownURL
+  = schemeP ':' .* { UnknownURL $1 $2 }
 
 |] 
 
@@ -130,23 +144,18 @@ absoluteURLP :: URL
 ----
 -- tests
 ----
-
-#ifdef test
-
+{-
 urlRelativeTOTests =
-  [ fromRight (parseURLTests !! 1) `urlRelativeTo` fromRight (parseURLTests !! 0)
-  , fromRight (parseURLTests !! 2) `urlRelativeTo` fromRight (parseURLTests !! 0)
-  , fromRight (parseURLTests !! 0) `urlRelativeTo` fromRight (parseURLTests !! 2)
-  , fromRight (parseURLTests !! 1) `urlRelativeTo` fromRight (parseURLTests !! 2)
-  , fromRight (parseURLTests !! 2) `urlRelativeTo` fromRight (parseURLTests !! 2) ]
+  [ fromRight (parseURLTests !! 1) `urlRelativeTo` fromLeft (parseURLTests !! 0)
+  , fromRight (parseURLTests !! 2) `urlRelativeTo` fromLeft (parseURLTests !! 0) ]
   where
+    fromLeft (Left a) = a
     fromRight (Right a) = a
 
 
-parseURLTests :: [Either String URL]
 parseURLTests = map parseURL
   [ "http://www.facebook.com/groups/assembly.reception/"
-  , "/groups/assembly.reception/#dsa"
-  , "assembly.reception/?asd" ]
+  , "/groups/assembly.reception/"
+  , "assembly.reception/" ]
 
-#endif
+-}

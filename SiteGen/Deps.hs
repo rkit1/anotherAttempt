@@ -1,27 +1,33 @@
 {-# LANGUAGE ScopedTypeVariables, BangPatterns, MultiParamTypeClasses, 
   FunctionalDependencies, GeneralizedNewtypeDeriving, FlexibleInstances #-}
-module Deps where
+module SiteGen.Deps where
 import qualified Data.Set as S
 import Control.Monad.State.Strict
 import Control.Monad.Reader
 import Control.Monad.Trans
 import qualified Data.Map.Strict as M
-import Data.Binary (encodeFile, decodeFile, Binary)
-import System.Directory
-import Data.Time.Clock
-import Data.Maybe
-import System.IO.Unsafe
+
+-- di = destination identifier site.com/a/b
+-- si = source identifier /home/user/a/b
 
 ----
--- runTime myCheckTime myCurTime $ runDepDBFile "/path" $ process (runDepRecordAndReport myProcess) initD
+-- run everything
 ----
 
+runEverything
+  :: (Monad m, Ord si, Ord di, Ord t) 
+  => (si -> m t)                            -- ^ Check time
+  -> m t                                    -- ^ Get current time
+  -> (di -> DepRecord si di m a)            -- ^ Process function
+  -> S.Set di                               -- ^ Initial destinations.
+  -> M.Map di (t, S.Set si, S.Set di)       -- ^ Initial memo table
+  -> m (M.Map di (t, S.Set si, S.Set di))   -- ^ Resulting memo table
+runEverything cht cut pr initD initT = runTime cht cut $ runDepDB $ process (runDepRecordAndReport pr) initD
 
 ----
 -- main loop
 ----
 
--- | Process all destinations reachable from the initial ones. Every destination is processed only once per run.
 process :: (Ord di, Monad m) 
   => (di -> m (S.Set di)) -- ^ Actual processing goes here.
                           -- Return set of destinations found 
@@ -61,18 +67,17 @@ runDepRecordAndReport :: (Monad m, Ord si, Ord di, Ord t)
   -> di 
   -> DepDB si di t (Time si t m) (S.Set di)
 runDepRecordAndReport f di = do
+  deps <- lookupDeps di
   let doit = do 
         (ss, dd) <- lift $ lift $ runDepRecord (f di)
         t <- curTime 
         recordDeps di t ss dd
         return dd
-  deps <- lookupDeps di
   case deps of
     Nothing -> doit
     Just (t, ss, dd) -> do
       c <- checkForChanges t ss
-      if c then doit 
-           else return dd
+      if c then doit else return dd
 
 ----
 -- DepDB
@@ -81,23 +86,8 @@ runDepRecordAndReport f di = do
 newtype DepDB si di t m a = DepDB (StateT (M.Map di (t, S.Set si, S.Set di)) m a)
   deriving (Monad, MonadIO, MonadTrans)
 
-runDepDB :: (Monad m, Ord si, Ord di) => M.Map di (t, S.Set si, S.Set di) -> DepDB si di t m a 
-         -> m (M.Map di (t, S.Set si, S.Set di))
-runDepDB initT (DepDB m) = execStateT m initT
-
--- | Run `DepDB` monad with actual database permanent storage taken care of.
-runDepDBFile :: (MonadIO m, Ord si, Binary si, Ord di, Binary di, Binary t) 
-  => FilePath -- ^ File is created automatically, but containing
-              -- directory should exist.
-  -> DepDB si di t m a -> m ()
-runDepDBFile fp m = do
-  !db <- liftIO $ do
-    c <- doesFileExist fp
-    if c 
-      then decodeFile fp 
-      else return M.empty
-  !db' <- runDepDB db m
-  liftIO $ encodeFile fp db'
+runDepDB :: (Monad m, Ord si, Ord di) => DepDB si di t m a -> m (M.Map di (t, S.Set si, S.Set di))
+runDepDB (DepDB m) = execStateT m M.empty
 
 class Monad m => DepDBMonad m si di t | m -> si di t where 
   recordDeps :: di -> t -> S.Set si -> S.Set di -> m ()
@@ -110,23 +100,6 @@ instance (Monad m, Ord si, Ord di) => DepDBMonad (DepDB si di t m) si di t where
 ----
 -- Time
 ----
-
--- | Alias for the `getCurrentTime` to use as a `curTime`
--- 
--- You should memorize this value, since time of the start of the
--- processing is enough, so there is no need to make a lots of extra
--- syscalls.
---
--- >do
--- >  t <- curTimeUTC
--- >  let myCurTime = return t
--- >  runTime myCheckTime myCurTime $ ...
-curTimeUTC :: MonadIO m => m UTCTime
-curTimeUTC = liftIO $ getCurrentTime
-
--- | Alias for the `getModificationTime` to use as a `checkTime`
-checkTimeFilePath :: MonadIO m => FilePath -> m UTCTime
-checkTimeFilePath fp = liftIO $ getModificationTime fp
 
 class Monad m => TimeMonad m si t | m -> si t where
   checkTime :: si -> m t
