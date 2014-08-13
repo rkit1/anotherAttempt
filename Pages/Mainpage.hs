@@ -1,4 +1,4 @@
-{-# LANGUAGE RecordWildCards, QuasiQuotes, NoMonomorphismRestriction, RecordWildCards #-}
+{-# LANGUAGE RecordWildCards, QuasiQuotes, NoMonomorphismRestriction, RecordWildCards, TemplateHaskell #-}
 module Pages.MainPage where
 
 import Library
@@ -15,9 +15,9 @@ import qualified Data.Set as S
 import PeopleDB
 import Deps
 
-readHead = undefined
-isNeedRebuild = undefined
-updateRebuildInfo = undefined
+readHead = $tundefined
+isNeedRebuild = $tundefined
+updateRebuildInfo = $tundefined
 
 type Builder a = [a] -> [a]
 
@@ -209,7 +209,7 @@ page PageSpec
     mpContent <- liftIO $ mapM readHead list
     return MainPage {..}
 -}
-page = undefined
+page = $tundefined
 
 wrapP :: String -> String
 wrapP = printf "<p>%s</p>"

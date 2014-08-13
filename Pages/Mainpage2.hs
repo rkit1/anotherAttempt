@@ -1,14 +1,14 @@
-{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleContexts, OverloadedStrings #-}
 module Pages.Mainpage2 where
 import Config.Parser (parseConfigFile)
 --import Path.Destination
 --import Path.Source
-import Path
+import ClubviRu.Path
 import Data.String
 import qualified Data.Map as M
 import Data.Char
 import Control.Monad
-import XmlTemplate.Head2
+import XmlTemplate.Head
 import Control.Monad.Writer
 import Library
 import SiteGen.Deps
@@ -45,7 +45,7 @@ runMainPage pageNumber configPath outPath = {- withCurrent configPath $ -} do
       myChunk = take 50 $ drop (50*pageNumber) mid
 
   news <- forM myChunk $ \ x -> do
-    x' <- readHead $ SP $ readPath x
+    x' <- readHead $ "./~head.htm.src" `relativeTo` (SP $ readPath x) 
     return $ mkDictionary [ ("content", Variable x' ) ]  
 
   str <- runMAndRecordSI $ do
@@ -84,8 +84,8 @@ processColumn str =
           callRTPL "/~templates/widget.rtpl"
         | Just t <- stripPrefix "raw:" i -> 
           callRTPL i
-        | otherwise ->
-          error $ printf "processColumn: %s" i
+        | otherwise -> return []
+--          error $ printf "processColumn: %s" i
 {-
       "!banner" -> undefined
       "!remember" -> undefined -}

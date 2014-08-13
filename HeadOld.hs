@@ -10,7 +10,7 @@ import XmlTemplate.Head
 import XmlTemplate.WidgetHead 
 import Library
 import Debug.Trace
-import Deps
+import SiteGen.Deps
 import PlainTemplate.Monad
 
 prefix = "x:"

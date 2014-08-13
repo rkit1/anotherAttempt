@@ -1,5 +1,5 @@
 {-# LANGUAGE OverloadedStrings, CPP#-}
-module Path where
+module ClubviRu.Path where
 import qualified Data.Text as T
 import Data.String
 import SiteGen.IO
@@ -24,7 +24,7 @@ class Path p where
 
 ------
 newtype DestinationPath = DP [T.Text] 
-    deriving (Show)
+    deriving (Show, Ord, Eq)
 
 instance Path DestinationPath where
     DP a `relativeTo` DP b = DP $ normalizePath $ a `pathRelativeTo` b
@@ -38,7 +38,7 @@ instance IsString DestinationPath where
 
 ------
 newtype SourcePath = SP [T.Text]
-    deriving (Show)
+    deriving (Show, Ord, Eq)
 
 instance Path SourcePath where
     SP a `relativeTo` SP b = SP $ normalizePath $ b ++ a

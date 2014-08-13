@@ -12,20 +12,45 @@ import qualified Data.Text as T
 import qualified Data.Map as M
 import qualified Blaze.ByteString.Builder as BZ
 import qualified Data.ByteString as BS
-import Path
+import ClubviRu.Path
 
-processWidgetHead path = withWidgetHead onNodes path
+processWidgetHeadFile = undefined
+--import PlainTemplate.Monad
+{-
+readHeadM :: FilePath -> M String
+readHeadM path = do
+  recordDepend path
+  readHead path
+-}
 
-withWidgetHead onNodes path = do
-  s <- liftIO $ BS.readFile ("x:/" ++ path ++ "/~WidgetHead.htm.src")
-  withSubst ("path", [TextNode $ T.pack path]) $ do
-    case parseXML path s of
-      Right XmlDocument{..} -> onNodes docContent
-      Left x -> error x
 
-processWidgetHeadFile fp' = do
-  let fp = fixPath fp'
-  (_,out) <- runMT M.empty (M.fromList [wImgTag]) $ processWidgetHead fp
-  h <- openFile (fp' ++ "/~WidgetHead.htm") WriteMode
-  BZ.toByteStringIO (BS.hPutStr h) $ nodesToBLDR out
-  hClose h
+{-
+readHeadAndRecordSI :: (MonadIO m, DepRecordMonad m FilePath di) => FilePath -> m String
+readHeadAndRecordSI path = do
+  recordSI (prefix ++ path ++ "/~head.htm")
+  readHead path
+
+readHead :: MonadIO m => String -> m String
+readHead path = liftIO $ do
+  let fp = prefix ++ path ++ "/~head.htm"
+  whenNotM (doesFileExist fp) $ processHeadFile (prefix ++ path)
+  forceReadFileE utf8 fp
+
+
+  
+readWidgetHead :: String -> IO String 
+readWidgetHead path = do
+  let fp = prefix ++ path ++ "/~WidgetHead.htm"
+  whenNotM (doesFileExist fp) $ processWidgetHeadFile (prefix ++ path)
+  forceReadFileE utf8 fp
+
+-}
+
+
+{-
+prefix = "x:"
+
+intro path = x ++ printf "<?$d=\"%s\";?>" path
+  where
+    x = unsafePerformIO (readFileE utf8 "x:/~templates/intro.php")
+-}

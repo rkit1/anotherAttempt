@@ -1,50 +1,40 @@
-{-# LANGUAGE RecordWildCards, QuasiQuotes, OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards, QuasiQuotes, OverloadedStrings, FlexibleContexts #-}
 module XmlTemplate.Head where
 
 --import MainMonad
 import XmlTemplate.Monad
 import XmlTemplate.Imgs
 import qualified Data.ByteString as BS
+import qualified Blaze.ByteString.Builder as BZ
 import Text.XmlHtml
-import Library
-import Library.System
 import qualified Data.Text as T
 import qualified Data.Map as M
-import qualified Blaze.ByteString.Builder as BZ
-import qualified Data.ByteString as BS
-import Path
-import Debug.Trace
-import System.FilePath as FP
+import SiteGen.IO as IO
+import System.IO
+import Control.Monad.Trans
+import ClubviRu.Path
+import SiteGen.Deps
+import Data.Knob
 
--- путь до директории
-processHead path = withHead onNodes path
+readHead :: (DepRecordMonad m SourcePath di, MonadSiteIO SourcePath di m) =>
+     SourcePath -> m String
+readHead sp = do
+  -- CHECKME
+  let (SP spdir) = "." `relativeTo` sp
+      path = toFilePath' "" spdir
+  s <- IO.readByteString sp
+  (_,nodes) <- runMT M.empty (M.fromList [imgsTag]) $ do
+                    withSubst ("path", [TextNode $ T.pack path ]) $ do 
+                      let Right HtmlDocument{..} = parseHTML (show sp) s
+                      onNodes docContent
+  liftIO $ do
+    knob <- newKnob (BS.pack [])
+    h <- newFileHandle knob "readHeadKnob" ReadWriteMode
+    BZ.toByteStringIO (BS.hPutStr h) $ nodesToBLDR nodes
+    hSeek h AbsoluteSeek 0
+    hSetEncoding h utf8
+    out <- hGetContents h
+    last out `seq` hClose h
+    return out
 
--- полный путь
-processHead2 path = withHead2 onNodes path
 
-withHead onNodes path = do
-  s <- liftIO $ BS.readFile ("x:/" ++ path ++ "/~head.htm.src")
-  withSubst ("path", [TextNode $ T.pack path]) $ do
-    let Right HtmlDocument{..} = parseHTML path s
-    onNodes docContent
-
-withHead2 onNodes path = do
-  s <- liftIO $ BS.readFile ("x:" ++ path)
-  withSubst ("path", [TextNode $ T.pack (FP.takeDirectory  path)]) $ do 
-    let Right HtmlDocument{..} = parseHTML path s
-    onNodes docContent
-
-processHeadFile :: FilePath -> IO ()
-processHeadFile fp' = do
-  let fp = fixPath fp'
-  (_,out) <- runMT M.empty (M.fromList [imgsTag]) $ processHead fp
-  h <- openFile (fp' ++ "/~head.htm") WriteMode
-  BZ.toByteStringIO (BS.hPutStr h) $ nodesToBLDR out
-  hClose h
-
-processHeadFile2 :: FilePath -> FilePath -> IO ()
-processHeadFile2 sfp fp = do
-  (_,out) <- runMT M.empty (M.fromList [imgsTag]) $ processHead2 sfp
-  h <- openBinaryFile ("x:/" ++ fp) WriteMode
-  BZ.toByteStringIO (BS.hPutStr h) $ nodesToBLDR out
-  hClose h

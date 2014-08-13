@@ -4,7 +4,6 @@ module PlainTemplate.Process where
 import PlainTemplate.Variable
 import PlainTemplate.Parser
 import PlainTemplate.Monad
-import Head
 import Library
 import Library.System
 import Data.Accessor.Monad.MTL.State ((%=),(%:))
