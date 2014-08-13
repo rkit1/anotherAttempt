@@ -1,5 +1,5 @@
 {-# LANGUAGE RecordWildCards, GeneralizedNewtypeDeriving, FlexibleInstances, 
-  MultiParamTypeClasses, UndecidableInstances, CPP, OverloadedStrings #-}
+  MultiParamTypeClasses, UndecidableInstances, OverloadedStrings #-}
 module ClubviRu.Monad where
 import Config.Site
 import Network.URI
@@ -9,9 +9,6 @@ import SiteGen.IO
 import SiteGen.Deps
 import ClubviRu.Path
 import System.IO
-#ifdef dev
-import Pages.Mainpage2
-#endif
 
 newtype ClubviRuMonad m a = ClubviRuMonad {runClubviRu :: m a} 
   deriving (Monad, MonadIO)
@@ -43,22 +40,13 @@ instance Monad m => SiteConfig (ClubviRuMonad m) where
         return "c:/Users/Victor/Documents/wrk/newsite/anotherAttemptSource/"
     destinationRoot = 
         return "c:/Users/Victor/Documents/wrk/newsite/anotherAttemptDestination/"
-    filterLinks links = return $ links >>= f . parseURI
+    filterLinks links = return $ links >>= f . parseURIReference
       where
         f Nothing = [] -- FIXME warning
         f (Just URI{..}) = case uriAuthority of
-           Nothing -> [uriPath ++ "?" ++ uriQuery ++ "#" ++ uriFragment]
+           Nothing -> [uriPath]
            Just URIAuth{..} 
-             | Nothing   <- find (== uriRegName) domainList -> []
-             | otherwise -> [uriPath ++ "?" ++ uriQuery ++ "#" ++ uriFragment]
+             | Nothing <- find (== uriRegName) domainList -> []
+             | uriPath == "" -> ["/"++uriPath]
+             | otherwise     -> [uriPath]
         domainList = ["clubvi.ru", "www.clubvi.ru"]
-
-
-
-
-#ifdef dev
-
-test = do
-  return () :: IO ()
-  runDepRecord $ runClubviRu $ runMainPage 0 "/index" "/index.htm"
-#endif

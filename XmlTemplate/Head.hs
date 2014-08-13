@@ -20,7 +20,7 @@ readHead :: (DepRecordMonad m SourcePath di, MonadSiteIO SourcePath di m) =>
      SourcePath -> m String
 readHead sp = do
   -- CHECKME
-  let (SP spdir) = "." `relativeTo` sp
+  let (SP spdir) = ".." `relativeTo` sp
       path = toFilePath' "" spdir
   s <- IO.readByteString sp
   (_,nodes) <- runMT M.empty (M.fromList [imgsTag]) $ do
