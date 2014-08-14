@@ -1,5 +1,5 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving, MultiParamTypeClasses, OverloadedStrings, FlexibleInstances, UndecidableInstances, NoMonomorphismRestriction, TemplateHaskell #-}
-module Debug.IO where
+module ClubviRu.Debug.IO where
 import Debug.Helpers
 import SiteGen.IO 
 import SiteGen.Deps

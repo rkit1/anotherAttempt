@@ -1,6 +1,6 @@
 {-# LANGUAGE FlexibleContexts, OverloadedStrings #-}
-module Pages.Mainpage2 where
-import Config.Parser (parseConfigFile)
+module ClubviRu.Pages.Mainpage where
+import ClubviRu.Config.Parser (parseConfigFile)
 --import Path.Destination
 --import Path.Source
 import ClubviRu.Path
@@ -22,8 +22,8 @@ import PlainTemplate.Variable
 import SiteGen.LinkExtractor
 import SiteGen.Deps
 import SiteGen.IO as IO
-import Config.Parser
-import Config.Site
+import ClubviRu.Config.Parser
+import ClubviRu.Config.Site
 
 
 

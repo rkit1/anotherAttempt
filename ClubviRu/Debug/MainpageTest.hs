@@ -1,6 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
-module Debug.MainpageTest where
-import Pages.Mainpage2
+module ClubviRu.Debug.MainpageTest where
+import ClubviRu.Pages.Mainpage
 import ClubviRu.Monad
 import SiteGen.Deps
 

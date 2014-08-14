@@ -1,5 +1,5 @@
 {-# Language TemplateHaskell, QuasiQuotes, FlexibleContexts #-}
-module Config.Parser where
+module ClubviRu.Config.Parser where
 import qualified Data.Map as M
 import Control.Monad.Trans
 import Text.Peggy

@@ -4,7 +4,7 @@ import qualified Data.Text as T
 import Data.String
 import SiteGen.IO
 import SiteGen.Deps
-import Config.Site
+import ClubviRu.Config.Site
 #ifdef dev
 import Control.Monad
 #endif

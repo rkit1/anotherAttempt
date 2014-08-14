@@ -1,7 +1,7 @@
 {-# LANGUAGE RecordWildCards, GeneralizedNewtypeDeriving, FlexibleInstances, 
   MultiParamTypeClasses, UndecidableInstances, OverloadedStrings #-}
 module ClubviRu.Monad where
-import Config.Site
+import ClubviRu.Config.Site
 import Network.URI
 import Data.List
 import Control.Monad.Trans

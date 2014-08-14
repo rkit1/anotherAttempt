@@ -1,5 +1,5 @@
 {-# LANGUAGE RecordWildCards, TemplateHaskell #-}
-module Debug.Helpers where
+module ClubviRu.Debug.Helpers where
 import Language.Haskell.TH
 import Language.Haskell.TH.Lift
 import Text.Printf
