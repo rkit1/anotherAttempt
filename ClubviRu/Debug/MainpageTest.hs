@@ -6,5 +6,5 @@ import SiteGen.Deps
 
 test = do
   return () :: IO ()
-  runDepRecord $ runClubviRu $ runMainPage 0 "/index" "/index.htm"
+  runDepRecord $ runClubviRu $ runMainPage 0 "/index.mp" "/index.htm"
 

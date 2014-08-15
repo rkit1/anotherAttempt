@@ -9,13 +9,18 @@ import qualified Data.ByteString.Lazy as LBS
 class MonadIO m => MonadSiteIO si di m | m -> si di where
   openSI :: si -> m Handle
   openDI :: di -> m Handle
+  doesExistSI :: si -> m Bool
+  copySI :: si -> di -> m ()
 
 instance MonadSiteIO si di m => MonadSiteIO si di (DepRecord si di m) where
   openSI = lift . openSI
   openDI = lift . openDI
+  doesExistSI = lift . doesExistSI
+  copySI si di = lift $ copySI si di
 
 
 ------
+{-
 newtype SIO si di t a = SIO (ReaderT (SIOData si di t) t a) deriving (Monad, MonadIO)
 instance MonadTrans (SIO si di) where
   lift m = SIO $ lift m
@@ -30,7 +35,7 @@ instance (MonadIO t) => MonadSiteIO si di (SIO si di t) where
 
 runSIO :: (si -> m Handle) -> (di -> m Handle) -> SIO si di m a -> m a
 runSIO _openSI _openDI (SIO m) = runReaderT m $ SIOData{..}
-
+-}
 
 readString :: (DepRecordMonad m si di, MonadSiteIO si di m) 
   => si -> m String
