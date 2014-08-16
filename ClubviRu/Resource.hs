@@ -3,6 +3,9 @@ module ClubviRu.Resource where
 import qualified Data.Text as T
 import Data.String
 
+data Source
+data Destination
+
 data Resource a = Resource
   { resPathType :: ResPathType
   , resPath :: [T.Text]
@@ -18,8 +21,15 @@ instance IsString (Resource a) where
       resName | last chunks == "" 
               || last chunks == "." = "index.htm"
               | otherwise = last chunks
-      resPath = removeUps $ removeEmptySegments $ init chunks
+      resPath = removeBeginningUps resPathType $ 
+                  removeUps $ removeEmptySegments $ init chunks
 
+
+toFilePath :: FilePath -> Resource a -> FilePath
+toFilePath root Resource{..} =
+    root ++ '/' :
+      concat [ T.unpack x ++ "/" | x <- removeBeginningUps Absolute resPath] ++ 
+      T.unpack resName
 
 data ResPathType = Relative | Absolute deriving Show
 
@@ -30,22 +40,32 @@ relativeTo a@Resource{resPath = r} b@Resource{..} =
 
 
 removeEmptySegments :: [T.Text] -> [T.Text]
-removeEmptySegments = filter (\ x -> x == "" || x == ".") 
+removeEmptySegments = filter (\ x -> x /= "" && x /= ".") 
+
+removeBeginningUps :: ResPathType -> [T.Text] -> [T.Text]
+removeBeginningUps Relative x = x
+removeBeginningUps _ ("..":xs) = removeBeginningUps Absolute xs
+removeBeginningUps _ a@(x:xs) = a
+removeBeginningUps _ [] = []
 
 removeUps :: [T.Text] -> [T.Text]
 removeUps a@("..":xs) = a
 removeUps (x:"..":xs) = removeUps xs
-removeUps (x:xs) = removeUps xs
+removeUps (x:xs) = x:removeUps xs
 removeUps [] = []
 
 {-
 
-*ClubviRu.Resource> fromString "./asd/ph.htm" :: Resource a
-Resource {resPathType = Relative, resPath = [], resName = "ph.htm"}
+test = mapM_ print x
+  where 
+    x :: [Resource a]
+    x = map fromString 
+        [ "./asd/ph.htm"
+        , "ph.htm"
+        , "/pg.htm"
+        , "../asd/dsa"
+        , "/../p"]
 
-
-pg.htm
-/pg.htm
-./asd/dsa
 
 -}
+
