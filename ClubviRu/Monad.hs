@@ -7,8 +7,9 @@ import Data.List
 import Control.Monad.Trans
 import SiteGen.IO
 import SiteGen.Deps
-import ClubviRu.Path
+import ClubviRu.Resource
 import System.IO
+import System.Directory
 
 newtype ClubviRuMonad m a = ClubviRuMonad {runClubviRu :: m a} 
   deriving (Monad, MonadIO)
@@ -25,14 +26,15 @@ instance MonadTrans ClubviRuMonad where
 
 instance (MonadIO m) => 
   MonadSiteIO SourcePath DestinationPath (ClubviRuMonad m) where
-    openDI di = toFilePath di >>= \ fp -> liftIO $ do
+    openDI di = toFilePathM di >>= \ fp -> liftIO $ do
                   h <- openFile fp WriteMode
                   hSetEncoding h utf8
                   return h
-    openSI si = toFilePath si >>= \ fp -> liftIO $ do
+    openSI si = toFilePathM si >>= \ fp -> liftIO $ do
                   h <- openFile fp ReadMode
                   hSetEncoding h utf8
                   return h
+    doesExistSI si = toFilePathM si >>= \ fp -> liftIO $ doesFileExist fp
 
 
 instance Monad m => SiteConfig (ClubviRuMonad m) where

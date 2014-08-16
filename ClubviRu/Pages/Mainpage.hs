@@ -3,7 +3,7 @@ module ClubviRu.Pages.Mainpage where
 import ClubviRu.Config.Parser (parseConfigFile)
 --import Path.Destination
 --import Path.Source
-import ClubviRu.Path
+import ClubviRu.Resource
 import Data.String
 import qualified Data.Map as M
 import Data.Char
@@ -45,7 +45,7 @@ runMainPage pageNumber configPath outPath = {- withCurrent configPath $ -} do
       myChunk = take 50 $ drop (50*pageNumber) mid
 
   news <- forM myChunk $ \ x -> do
-    x' <- readHead $ "./~head.htm.src" `relativeTo` (SP $ readPath x) 
+    x' <- readHead $ "~head.htm.src" `relativeTo` fromString x 
     return $ mkDictionary [ ("content", Variable x' ) ]  
 
   str <- runMAndRecordSI $ do

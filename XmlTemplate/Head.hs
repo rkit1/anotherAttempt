@@ -12,20 +12,18 @@ import qualified Data.Map as M
 import SiteGen.IO as IO
 import System.IO
 import Control.Monad.Trans
-import ClubviRu.Path
+import ClubviRu.Resource
 import SiteGen.Deps
 import Data.Knob
 
 readHead :: (DepRecordMonad m SourcePath di, MonadSiteIO SourcePath di m) =>
      SourcePath -> m String
-readHead sp = do
-  -- CHECKME
-  let (SP spdir) = ".." `relativeTo` sp
-      path = toFilePath' "" spdir
-  s <- IO.readByteString sp
+readHead src = do
+  let path = pathToString src
+  s <- IO.readByteString src
   (_,nodes) <- runMT M.empty (M.fromList [imgsTag]) $ do
                     withSubst ("path", [TextNode $ T.pack path ]) $ do 
-                      let Right HtmlDocument{..} = parseHTML (show sp) s
+                      let Right HtmlDocument{..} = parseHTML (show src) s
                       onNodes docContent
   liftIO $ do
     knob <- newKnob (BS.pack [])

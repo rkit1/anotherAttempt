@@ -2,15 +2,31 @@
 module ClubviRu.Resource where
 import qualified Data.Text as T
 import Data.String
+import ClubviRu.Config.Site
+
+type SourcePath = Resource Source
+type DestinationPath = Resource Destination
 
 data Source
 data Destination
+
+class ResType r where
+  resRoot :: SiteConfig m => Resource r -> m FilePath
+
+instance ResType Source where
+  resRoot _ = sourceRoot
+
+instance ResType Destination where
+  resRoot _ = destinationRoot
 
 data Resource a = Resource
   { resPathType :: ResPathType
   , resPath :: [T.Text]
   , resName :: T.Text
-  } deriving Show
+  } deriving (Show, Eq, Ord)
+
+data ResPathType = Relative | Absolute 
+  deriving (Show, Eq, Ord)
 
 instance IsString (Resource a) where
   fromString str = Resource{..}
@@ -24,14 +40,22 @@ instance IsString (Resource a) where
       resPath = removeBeginningUps resPathType $ 
                   removeUps $ removeEmptySegments $ init chunks
 
+toFilePathM :: (SiteConfig m, ResType r) => Resource r -> m FilePath
+toFilePathM res = do
+  root <- resRoot res
+  return $ toFilePath root res
 
 toFilePath :: FilePath -> Resource a -> FilePath
 toFilePath root Resource{..} =
-    root ++ '/' :
+    root ++ 
+      '/' :
       concat [ T.unpack x ++ "/" | x <- removeBeginningUps Absolute resPath] ++ 
       T.unpack resName
 
-data ResPathType = Relative | Absolute deriving Show
+pathToString :: Resource a -> FilePath
+pathToString Resource{..} = '/' :
+  concat [ T.unpack x ++ "/" | x <- removeBeginningUps Absolute resPath]
+
 
 relativeTo :: Resource a -> Resource a -> Resource a
 relativeTo a@Resource{resPathType = Absolute} b = a
