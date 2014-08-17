@@ -6,6 +6,9 @@ import ClubviRu.Config.Site
 
 type SourcePath = Resource Source
 type DestinationPath = Resource Destination
+type SP = Resource Source
+type DP = Resource Destination
+
 
 data Source
 data Destination
@@ -51,6 +54,17 @@ toFilePath root Resource{..} =
       '/' :
       concat [ T.unpack x ++ "/" | x <- removeBeginningUps Absolute resPath] ++ 
       T.unpack resName
+
+toDirectoryPathM :: (SiteConfig m, ResType r) => Resource r -> m FilePath
+toDirectoryPathM res = do
+  root <- resRoot res
+  return $ toDirectoryPath root res
+
+toDirectoryPath :: FilePath -> Resource a -> FilePath
+toDirectoryPath root Resource{..} =
+    root ++ 
+      '/' :
+      concat [ T.unpack x ++ "/" | x <- removeBeginningUps Absolute resPath]
 
 pathToString :: Resource a -> FilePath
 pathToString Resource{..} = '/' :

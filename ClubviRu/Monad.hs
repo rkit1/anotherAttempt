@@ -26,10 +26,14 @@ instance MonadTrans ClubviRuMonad where
 
 instance (MonadIO m) => 
   MonadSiteIO SourcePath DestinationPath (ClubviRuMonad m) where
-    openDI di = toFilePathM di >>= \ fp -> liftIO $ do
-                  h <- openFile fp WriteMode
-                  hSetEncoding h utf8
-                  return h
+    openDI di@Resource{..} = do
+      fp <- toFilePathM di
+      dp <- toDirectoryPathM di
+      liftIO $ do
+        createDirectoryIfMissing True dp
+        h <- openFile fp WriteMode
+        hSetEncoding h utf8
+        return h
     openSI si = toFilePathM si >>= \ fp -> liftIO $ do
                   h <- openFile fp ReadMode
                   hSetEncoding h utf8
