@@ -41,7 +41,7 @@ process process set = go S.empty set
      | Just (dst, queueTail) <- S.minView queue = do
        ds <- process dst
        let done' = S.insert dst done
-           queue' = queue `S.union` (ds `S.difference` done')
+           queue' = queueTail `S.union` (ds `S.difference` done')
        go done' queue'   
 
 ----
