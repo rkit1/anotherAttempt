@@ -15,7 +15,7 @@ import SiteGen.IO
 import SiteGen.Deps
 import qualified Data.ByteString.Lazy as LBS
 import qualified Data.Text as T
-
+import Text.Printf
 
 ----
 newtype PathHandler m a =
@@ -73,7 +73,7 @@ clubviRoute ::
 clubviRoute = msum
   [ exactFile 
   , mainPage
-  , return ()
+  , unhandled
   ]
   where
     exactFile = do
@@ -91,6 +91,10 @@ clubviRoute = msum
       let s = Resource{resName = resName `changeExt` "mp", .. }
       doesExistSI s >>= guard
       lift $ runMainPage 0 s d
+    unhandled = do
+      d <- PH get
+      liftIO $ printf "unhandled desination: %s\n" (show d)
+
 
 
 changeExt :: T.Text -> T.Text -> T.Text
