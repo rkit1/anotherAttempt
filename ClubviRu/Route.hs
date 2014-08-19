@@ -6,6 +6,7 @@ import ClubviRu.Config.Site
 import ClubviRu.Resource
 import ClubviRu.Debug.Helpers
 import ClubviRu.Pages.Mainpage
+import ClubviRu.DepFile
 import System.Directory
 import Control.Monad.Trans
 import Control.Monad.Cont
@@ -16,6 +17,7 @@ import SiteGen.Deps
 import qualified Data.ByteString.Lazy as LBS
 import qualified Data.Text as T
 import Text.Printf
+
 
 ----
 newtype PathHandler m a =
@@ -74,7 +76,7 @@ clubviRoute = msum
   [ exactFile 
   , mainPage
   , unhandled
-  ]
+  ] 
   where
     exactFile = do
       d@Resource{..} <- PH get
@@ -85,7 +87,16 @@ clubviRoute = msum
         hd <- openDI d
         cts <- liftIO $  LBS.hGetContents hs
         liftIO $ LBS.hPutStr hd cts
-      -- FIXME collect deps
+
+      let df = s `addExt` "deps"
+      ( do
+          doesExistSI df >>= guard
+          lift $ do
+            deps <- readDepFile  df
+            forM_ deps $ \ dep -> recordDI $ dep `relativeTo` d
+        ) `mplus` return ()
+
+
     mainPage = do
       d@Resource{..} <- PH get
       let s = Resource{resName = resName `changeExt` "mp", .. }
@@ -96,13 +107,17 @@ clubviRoute = msum
       liftIO $ printf "unhandled desination: %s\n" (show d)
 
 
+changeExt = changeExtT -- FIXME
 
-changeExt :: T.Text -> T.Text -> T.Text
-changeExt name ext = T.intercalate "." (baseNameChunks ++ [ext])
+changeExtT :: T.Text -> T.Text -> T.Text
+changeExtT name ext = T.intercalate "." (baseNameChunks ++ [ext])
   where
     split = T.splitOn "." name
     baseNameChunks | x:y:xs <- split = init split
                    | otherwise = [name]
             
 
+addExt s@Resource{..} ext = s{resName = resName `addExtT` ext}
 
+addExtT :: T.Text -> T.Text -> T.Text
+addExtT name ext = T.intercalate "." [name,ext]

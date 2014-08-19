@@ -3,10 +3,6 @@ module SiteGen.LinkExtractor where
 import Data.List
 import Text.HTML.TagSoup
 
-#ifdef dev
-import Control.Monad
-#endif
-
 extractLinkStrings :: String -> [String]
 extractLinkStrings str = parseTags str >>= f
   where
@@ -20,10 +16,3 @@ extractLinkStrings str = parseTags str >>= f
       , "link" % "href"
       , "script" % "src" ]
     (%) = (,)
-
-#ifdef dev
-test = do
-  x <- readFile "x:/index.htm"
-  forM_ (extractLinkStrings x) print
-  
-#endif
