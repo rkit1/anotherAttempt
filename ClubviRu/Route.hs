@@ -70,44 +70,64 @@ dirSegment = do
 clubviRoute :: 
   ( DepRecordMonad m SP DP
   , SiteConfig m
-  , MonadSiteIO SP DP m) 
+  , MonadSiteIO SP DP m ) 
   => PathHandler m ()
 clubviRoute = msum
-  [ exactFile 
-  , mainPage
+  [ exactFile >> depFile
+  , mainPage >> depFile
   , unhandled
   ] 
   where
-    exactFile = do
-      d@Resource{..} <- PH get
-      let s = Resource{..}
-      doesExistSI s >>= guard
-      lift $ do
-        hs <- openSI s
-        hd <- openDI d
-        cts <- liftIO $  LBS.hGetContents hs
-        liftIO $ LBS.hPutStr hd cts
-
-      let df = s `addExt` "deps"
-      ( do
-          doesExistSI df >>= guard
-          lift $ do
-            deps <- readDepFile  df
-            forM_ deps $ \ dep -> recordDI $ dep `relativeTo` d
-        ) `mplus` return ()
-
-
-    mainPage = do
-      d@Resource{..} <- PH get
-      let s = Resource{resName = resName `changeExt` "mp", .. }
-      doesExistSI s >>= guard
-      lift $ runMainPage 0 s d
     unhandled = do
       d <- PH get
       liftIO $ printf "unhandled desination: %s\n" (show d)
 
 
-changeExt = changeExtT -- FIXME
+mainPage ::
+  ( DepRecordMonad m SP DP
+  , MonadSiteIO SP DP m
+  , SiteConfig m ) 
+  => PathHandler m ()
+mainPage = do
+  d@Resource{..} <- PH get
+  let s = Resource{resName = resName `changeExtT` "mp", .. }
+  doesExistSI s >>= guard
+  lift $ runMainPage 0 s d
+
+exactFile :: 
+  ( DepRecordMonad m SP DP
+  , MonadSiteIO SP DP m ) 
+  => PathHandler m ()
+exactFile = do
+  d@Resource{..} <- PH get
+  let s = Resource{..}
+  doesExistSI s >>= guard
+  lift $ do
+    hs <- openSI s
+    hd <- openDI d
+    cts <- liftIO $  LBS.hGetContents hs
+    liftIO $ LBS.hPutStr hd cts
+
+depFile ::
+  ( DepRecordMonad m SP DP
+  , MonadSiteIO SP DP m ) 
+  => PathHandler m ()
+depFile = do
+  d@Resource{..} <- PH get
+  let s = Resource{..}
+  let df = s `addExt` "deps"
+  ( do
+    doesExistSI df >>= guard
+    lift $ do
+      deps <- readDepFile  df
+      forM_ deps $ \ dep -> recordDI $ dep `relativeTo` d
+    ) `mplus` return ()
+
+
+
+----
+changeExt :: Resource a -> T.Text -> Resource a
+changeExt s@Resource{..} ext = s{resName = resName `changeExtT` ext}
 
 changeExtT :: T.Text -> T.Text -> T.Text
 changeExtT name ext = T.intercalate "." (baseNameChunks ++ [ext])
@@ -117,6 +137,7 @@ changeExtT name ext = T.intercalate "." (baseNameChunks ++ [ext])
                    | otherwise = [name]
             
 
+addExt :: Resource a -> T.Text -> Resource a
 addExt s@Resource{..} ext = s{resName = resName `addExtT` ext}
 
 addExtT :: T.Text -> T.Text -> T.Text

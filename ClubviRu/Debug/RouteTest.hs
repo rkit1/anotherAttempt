@@ -7,7 +7,7 @@ import SiteGen.Deps
 
 
 test :: IO ()
-test = process f (S.singleton "/index.htm")
+test = process f $ S.singleton "/index.htm"
   where 
     f d = do
       (ss, ds) <- runDepRecord $ runClubviRu $ runPathHandler d clubviRoute
