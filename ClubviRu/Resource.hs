@@ -3,7 +3,10 @@ module ClubviRu.Resource where
 import qualified Data.Text as T
 import Data.String
 import ClubviRu.Config.Site
+import Control.Monad.Error
 
+
+----
 type SourcePath = Resource Source
 type DestinationPath = Resource Destination
 type SP = Resource Source
@@ -43,6 +46,8 @@ instance IsString (Resource a) where
       resPath = removeBeginningUps resPathType $ 
                   removeUps $ removeEmptySegments $ init chunks
 
+
+----
 toFilePathM :: (SiteConfig m, ResType r) => Resource r -> m FilePath
 toFilePathM res = do
   root <- resRoot res
@@ -66,6 +71,7 @@ toDirectoryPath root Resource{..} =
       '/' :
       concat [ T.unpack x ++ "/" | x <- removeBeginningUps Absolute resPath]
 
+
 pathToString :: Resource a -> FilePath
 pathToString Resource{..} = '/' :
   concat [ T.unpack x ++ "/" | x <- removeBeginningUps Absolute resPath]
@@ -77,6 +83,7 @@ relativeTo a@Resource{resPath = r} b@Resource{..} =
     a{resPath = removeUps $ resPath ++ r, resPathType = resPathType}
 
 
+----
 removeEmptySegments :: [T.Text] -> [T.Text]
 removeEmptySegments = filter (\ x -> x /= "" && x /= ".") 
 
@@ -91,6 +98,8 @@ removeUps a@("..":xs) = a
 removeUps (x:"..":xs) = removeUps xs
 removeUps (x:xs) = x:removeUps xs
 removeUps [] = []
+
+
 
 {-
 
