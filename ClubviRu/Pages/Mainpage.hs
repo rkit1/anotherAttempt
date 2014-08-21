@@ -24,7 +24,7 @@ import SiteGen.Deps
 import SiteGen.IO as IO
 import ClubviRu.Config.Parser
 import ClubviRu.Config.Site
-
+import ClubviRu.URIParser
 
 
 (!) :: Monad m => M.Map String a -> String -> m a

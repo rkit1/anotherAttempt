@@ -46,13 +46,4 @@ instance Monad m => SiteConfig (ClubviRuMonad m) where
         return "c:/Users/Victor/Documents/wrk/newsite/anotherAttemptSource/"
     destinationRoot = 
         return "c:/Users/Victor/Documents/wrk/newsite/anotherAttemptDestination/"
-    filterLinks links = return $ links >>= f . parseURIReference
-      where
-        f Nothing = [] -- FIXME warning
-        f (Just URI{..}) = case uriAuthority of
-           Nothing -> [uriPath]
-           Just URIAuth{..} 
-             | Nothing <- find (== uriRegName) domainList -> []
-             | uriPath == "" -> ["/"++uriPath]
-             | otherwise     -> [uriPath]
-        domainList = ["clubvi.ru", "www.clubvi.ru"]
+    myDomains = return ["clubvi.ru", "www.clubvi.ru"]
