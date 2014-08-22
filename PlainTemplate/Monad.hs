@@ -1,4 +1,6 @@
-{-# LANGUAGE TypeSynonymInstances, MultiParamTypeClasses, FlexibleInstances, UndecidableInstances, RecordWildCards, TemplateHaskell, FlexibleContexts #-}
+{-# LANGUAGE TypeSynonymInstances, MultiParamTypeClasses, FlexibleInstances
+  , UndecidableInstances, RecordWildCards, TemplateHaskell, FlexibleContexts
+  , GeneralizedNewtypeDeriving #-}
 module PlainTemplate.Monad where
 import Library
 import qualified Data.Map as M
@@ -18,19 +20,8 @@ import Control.Exception as E
 class (MonadState S m, MonadIO m, MonadError String m) => PTLMonad m
 instance (MonadState S m, MonadIO m, MonadError String m) => PTLMonad m
 
-type M = ME (StateT S IO)
-         
 newtype ME m a = ME { runME :: m (Either E a) }
 
-runM :: ME (StateT S IO) a -> IO (Either E a)
-runM m = evalStateT ( runME m ) $ 
-  S { stack_ = 
-      [ StackElem
-        { context__ = Dictionary M.empty
-        , tag__ = (undefined <++> id) $ head $ (undefined <++> id )
-                  $ runP body () "no location" "[dummytag]"
-        } ]
-    , depends_ = S.empty }
 
 data E = E (SourcePos,SourcePos) String deriving Show
 
@@ -61,7 +52,7 @@ instance Monad m => Monad (ME m) where
 instance MonadTrans ME where
   lift m = ME $ Right `liftM` m
 
-instance MonadError String (ME (StateT S IO)) where
+instance Monad m => MonadError String (ME (StateT S m)) where
   throwError str = ME $ do
     Tag p _ _ _ <- A.get tag
     return $ Left $ E p str 
@@ -107,3 +98,19 @@ infixr 0 $=.
 ($=.) :: (Typeable a, PTLMonad m)
   => String -> m a -> m ()
 a $=. b = b >>= \ b' -> a $= b'
+
+newtype M m a = M {runM' :: ME (StateT S m) a}
+  deriving (Monad, MonadError String, MonadIO, MonadState S)
+
+instance MonadTrans M where
+  lift m = lift m
+
+runM :: Monad m => M m a -> m (Either E a)
+runM (M m) = evalStateT ( runME m ) $ 
+  S { stack_ = 
+      [ StackElem
+        { context__ = Dictionary M.empty
+        , tag__ = (undefined <++> id) $ head $ (undefined <++> id )
+                  $ runP body () "no location" "[dummytag]"
+        } ]
+    , depends_ = S.empty }

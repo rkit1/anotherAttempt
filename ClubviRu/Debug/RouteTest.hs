@@ -14,4 +14,3 @@ test = process f $ S.fromList ["/index.htm", "/remember.htm"]
     f d = do
       (ss, ds) <- runDepRecord $ runClubviRu $ runPathHandler d clubviRoute
       return ds
-

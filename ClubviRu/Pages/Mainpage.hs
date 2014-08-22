@@ -65,9 +65,9 @@ runMainPage pageNumber configPath outPath = do
 
 
 
-runMAndRecordSI :: (MonadIO m, DepRecordMonad m SourcePath di) => M a -> m a
+runMAndRecordSI :: (MonadIO m, DepRecordMonad m SourcePath di) => M m a -> m a
 runMAndRecordSI m = do
-  res <- liftIO $ runM $ do
+  res <- runM $ do
     a <- m
     deps <- A.get depends
     return (a, deps)
