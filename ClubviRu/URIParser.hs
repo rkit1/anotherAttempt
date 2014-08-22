@@ -9,7 +9,7 @@ filterLinks :: SiteConfig m => [String] -> m [String]
 filterLinks links = do
   dmns <- myDomains
   let
-    f (Right ParseResult{..}) | Just _ <- find (== host) dmns = [path]
+    f (Right ParseResult{..}) | Just _ <- find (== host) ("":dmns) = [path]
     f _ = []
     parse str = parseString uRIP str str
   return $ links >>= f . parse
@@ -20,7 +20,7 @@ filterLinks links = do
 data ParseResult = ParseResult
   { host :: String
   , path :: String }
-
+  deriving Show
 
 [peggy|
 
@@ -38,7 +38,7 @@ portP :: Int
   = [0-9]+ { read $1 }
 
 pathP :: String
-  = [^?#]+
+  = [^?#]*
 
 queryP :: String
   = [^#]*
@@ -59,3 +59,5 @@ absoluteURIP :: ParseResult
     { ParseResult $3 $5 }
 
 |] 
+
+
