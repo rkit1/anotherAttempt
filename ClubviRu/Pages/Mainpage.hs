@@ -37,7 +37,7 @@ runMainPage
   :: (IsString di, SiteConfig m, DepRecordMonad m SourcePath di,
       MonadSiteIO SourcePath di m) =>
      Int -> SourcePath -> di -> m ()
-runMainPage pageNumber configPath outPath = {- withCurrent configPath $ -} do
+runMainPage pageNumber configPath outPath = do
   Right cfg <- parseConfig `liftM` IO.readString configPath
 
   mid' <- cfg ! "mid"
@@ -80,10 +80,10 @@ processColumn str =
   in liftM concat $ forM list $ \ item -> 
     case item of
       i | Just t <- stripPrefix "widget:" i -> do
-          callRTPL i
+          callRTPL t
           callRTPL "/~templates/widget.rtpl"
         | Just t <- stripPrefix "raw:" i -> 
-          callRTPL i
+          callRTPL t
         | otherwise -> return []
 --          error $ printf "processColumn: %s" i
 {-
