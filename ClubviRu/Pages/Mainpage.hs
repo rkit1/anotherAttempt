@@ -1,9 +1,10 @@
-{-# LANGUAGE FlexibleContexts, OverloadedStrings #-}
+{-# LANGUAGE FlexibleContexts, OverloadedStrings, TemplateHaskell #-}
 module ClubviRu.Pages.Mainpage where
 import ClubviRu.Config.Parser (parseConfigFile)
 --import Path.Destination
 --import Path.Source
 import ClubviRu.Resource
+import ClubviRu.Debug.Helpers
 import Data.String
 import qualified Data.Map as M
 import Data.Char
@@ -66,15 +67,18 @@ runMainPage pageNumber configPath outPath = do
 
 runMAndRecordSI :: (MonadIO m, DepRecordMonad m SourcePath di) => M a -> m a
 runMAndRecordSI m = do
-  Right (a, deps) <- liftIO $ runM $ do
-                       a <- m
-                       deps <- A.get depends
-                       return (a, deps)
-  forM_ (S.toList deps) $ recordSI . fromString
-  return a
+  res <- liftIO $ runM $ do
+    a <- m
+    deps <- A.get depends
+    return (a, deps)
+  case res of
+    Right (a, deps) -> do
+      forM_ (S.toList deps) $ recordSI . fromString
+      return a
+    Left err -> $terror (show err)
 
 
-processColumn :: String -> M String
+processColumn :: PTLMonad m => String -> m String
 processColumn str = 
   let list = filter (not . all isSpace) $ lines str
   in liftM concat $ forM list $ \ item -> 

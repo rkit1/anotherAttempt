@@ -1,4 +1,4 @@
-{-# LANGUAGE TypeSynonymInstances, MultiParamTypeClasses, FlexibleInstances, UndecidableInstances, RecordWildCards, TemplateHaskell #-}
+{-# LANGUAGE TypeSynonymInstances, MultiParamTypeClasses, FlexibleInstances, UndecidableInstances, RecordWildCards, TemplateHaskell, FlexibleContexts #-}
 module PlainTemplate.Monad where
 import Library
 import qualified Data.Map as M
@@ -14,9 +14,23 @@ import qualified Data.Accessor.Monad.MTL.State as A
 import Data.Accessor.Template
 import Control.Exception as E
 
-type M = ME (StateT S IO)
 
+class (MonadState S m, MonadIO m, MonadError String m) => PTLMonad m
+instance (MonadState S m, MonadIO m, MonadError String m) => PTLMonad m
+
+type M = ME (StateT S IO)
+         
 newtype ME m a = ME { runME :: m (Either E a) }
+
+runM :: ME (StateT S IO) a -> IO (Either E a)
+runM m = evalStateT ( runME m ) $ 
+  S { stack_ = 
+      [ StackElem
+        { context__ = Dictionary M.empty
+        , tag__ = (undefined <++> id) $ head $ (undefined <++> id )
+                  $ runP body () "no location" "[dummytag]"
+        } ]
+    , depends_ = S.empty }
 
 data E = E (SourcePos,SourcePos) String deriving Show
 
@@ -47,7 +61,7 @@ instance Monad m => Monad (ME m) where
 instance MonadTrans ME where
   lift m = ME $ Right `liftM` m
 
-instance MonadError String M where
+instance MonadError String (ME (StateT S IO)) where
   throwError str = ME $ do
     Tag p _ _ _ <- A.get tag
     return $ Left $ E p str 
@@ -68,33 +82,28 @@ instance (Error a, MonadError a (ME m), MonadIO m) => MonadIO (ME m) where
       Left e -> throwError $ strMsg $ show (e :: SomeException)
       Right z -> return z
 
-lookupVar :: String -> M Variable
+lookupVar :: PTLMonad m => String -> m Variable
 lookupVar str = do
   Dictionary x <- A.get context
   case M.lookup str x of
     Just a -> return a
     Nothing -> throwError $ strMsg $ "Variable not found: " ++ str
 
-setVar :: String -> Variable -> M ()
+setVar :: PTLMonad m => String -> Variable -> m ()
 setVar nm var = context %: \ (Dictionary a) -> Dictionary $ M.insert nm var a
 
-updateVars :: Dictionary -> M ()
+updateVars :: PTLMonad m => Dictionary -> m ()
 updateVars (Dictionary a) = context %: \ (Dictionary b) -> Dictionary $ M.union a b
 
-runM :: M a -> IO (Either E a)
-runM m = evalStateT ( runME m ) $ 
-  S { stack_ = 
-      [ StackElem
-        { context__ = Dictionary M.empty
-        , tag__ = (undefined <++> id) $ head $ (undefined <++> id ) $ runP body () "no location" "[dummytag]"
-        } ]
-    , depends_ = S.empty }
-
-recordDepend :: FilePath -> M ()
+recordDepend :: PTLMonad m => FilePath -> m ()
 recordDepend d = depends %: S.insert d
 
 infixr 0 $=
-($=) :: Typeable a => String -> a -> M ()
+($=) :: (Typeable a, PTLMonad m) => String -> a -> m ()
 ($=) n v = setVar n (Variable v)
+
+
 infixr 0 $=.
+($=.) :: (Typeable a, PTLMonad m)
+  => String -> m a -> m ()
 a $=. b = b >>= \ b' -> a $= b'
