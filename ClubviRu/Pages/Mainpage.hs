@@ -10,6 +10,7 @@ import qualified Data.Map as M
 import Data.Char
 import Control.Monad
 import XmlTemplate.Head
+import XmlTemplate.WidgetHead
 import Control.Monad.Writer
 import Library
 import SiteGen.Deps
@@ -83,11 +84,27 @@ processColumn str =
   let list = filter (not . all isSpace) $ lines str
   in liftM concat $ forM list $ \ item -> 
     case item of
-      i | Just t <- stripPrefix "widget:" i -> do
+      i | Just t <- stripPrefix "!widget:" i -> do
           callRTPL (fromString t)
           callRTPL "/~templates/widget.rtpl"
-        | Just t <- stripPrefix "raw:" i -> 
-          callRTPL (fromString t)
+        | Just t <- stripPrefix "!raw:" i -> 
+          IO.readString (fromString t)
+        | Just t <- stripPrefix "!widgetListing:" i -> do
+          Right cfg <- parseConfig `liftM` IO.readString (fromString t)
+          mid' <- cfg ! "mid"
+          let mid = filter (not . all isSpace) $ lines mid'
+          listing <- forM mid $ \ i -> do
+            str <- readWidgetHead $ "~widgetHead.htm.src" `relativeTo` fromString i
+            return $ mkDictionary [ ("content", Variable str) ]
+          let
+            -- FIXME poor code
+            link = toFilePath "" (fromString t `changeExt` "htm")
+            foot = "<p><a href=\"" ++ link ++ "\">Все материалы</a></p><p></p>"
+          "head" $=. cfg ! "title"
+          "listing" $= listing
+          "footer" $= foot
+          ("body" $=) =<< callRTPL "/~templates/WidgetListing.rtpl"
+          callRTPL "/~templates/widget.rtpl"
         | otherwise -> return []
 --          error $ printf "processColumn: %s" i
 {-

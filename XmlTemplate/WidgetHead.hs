@@ -1,4 +1,5 @@
-{-# LANGUAGE RecordWildCards, QuasiQuotes, OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards, QuasiQuotes, OverloadedStrings, TemplateHaskell
+  , FlexibleContexts #-}
 module XmlTemplate.WidgetHead where
 
 --import MainMonad
@@ -12,45 +13,49 @@ import qualified Data.Text as T
 import qualified Data.Map as M
 import qualified Blaze.ByteString.Builder as BZ
 import qualified Data.ByteString as BS
-import ClubviRu.Path
+import SiteGen.IO
+import SiteGen.Deps
+import ClubviRu.Debug.Helpers
+import ClubviRu.Resource
+import qualified Data.Map as M
+import Data.Knob
 
-processWidgetHeadFile = undefined
---import PlainTemplate.Monad
-{-
-readHeadM :: FilePath -> M String
-readHeadM path = do
-  recordDepend path
-  readHead path
--}
-
-
-{-
-readHeadAndRecordSI :: (MonadIO m, DepRecordMonad m FilePath di) => FilePath -> m String
-readHeadAndRecordSI path = do
-  recordSI (prefix ++ path ++ "/~head.htm")
-  readHead path
-
-readHead :: MonadIO m => String -> m String
-readHead path = liftIO $ do
-  let fp = prefix ++ path ++ "/~head.htm"
-  whenNotM (doesFileExist fp) $ processHeadFile (prefix ++ path)
-  forceReadFileE utf8 fp
-
-
-  
-readWidgetHead :: String -> IO String 
-readWidgetHead path = do
-  let fp = prefix ++ path ++ "/~WidgetHead.htm"
-  whenNotM (doesFileExist fp) $ processWidgetHeadFile (prefix ++ path)
-  forceReadFileE utf8 fp
-
--}
+readWidgetHead
+  :: (DepRecordMonad m SP DP,
+      MonadSiteIO SP DP m) =>
+     SP -> m String
+readWidgetHead path@Resource{..} = do
+  s <- readByteString path
+  (_,nodes) <- case parseXML (show path) s of
+   Left x -> $terror x
+   Right XmlDocument{..} -> runMT M.empty (M.fromList [wImgTag]) $ do
+     withSubst ("path", [TextNode $ T.pack (pathToString path)])
+       $ onNodes docContent  
+  liftIO $ do
+    knob <- newKnob (BS.pack [])
+    h <- newFileHandle knob "readHeadKnob" ReadWriteMode
+    BZ.toByteStringIO (BS.hPutStr h) $ nodesToBLDR nodes
+    hSeek h AbsoluteSeek 0
+    hSetEncoding h utf8
+    out <- hGetContents h
+    last out `seq` hClose h
+    return out
 
 
 {-
-prefix = "x:"
+processWidgetHead path = withWidgetHead onNodes path
 
-intro path = x ++ printf "<?$d=\"%s\";?>" path
-  where
-    x = unsafePerformIO (readFileE utf8 "x:/~templates/intro.php")
+withWidgetHead onNodes path = do
+  s <- liftIO $ BS.readFile ("x:/" ++ path ++ "/~WidgetHead.htm.src")
+  withSubst ("path", [TextNode $ T.pack path]) $ do
+    case parseXML path s of
+      Right XmlDocument{..} -> onNodes docContent
+      Left x -> error x
+
+processWidgetHeadFile fp' = do
+  let fp = fixPath fp'
+  (_,out) <- runMT M.empty (M.fromList [wImgTag]) $ processWidgetHead fp
+  h <- openFile (fp' ++ "/~WidgetHead.htm") WriteMode
+  BZ.toByteStringIO (BS.hPutStr h) $ nodesToBLDR out
+  hClose h
 -}

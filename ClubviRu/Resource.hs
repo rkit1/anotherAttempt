@@ -100,6 +100,24 @@ removeUps (x:xs) = x:removeUps xs
 removeUps [] = []
 
 
+----
+changeExt :: Resource a -> T.Text -> Resource a
+changeExt s@Resource{..} ext = s{resName = resName `changeExtT` ext}
+
+changeExtT :: T.Text -> T.Text -> T.Text
+changeExtT name ext = T.intercalate "." (baseNameChunks ++ [ext])
+  where
+    split = T.splitOn "." name
+    baseNameChunks | x:y:xs <- split = init split
+                   | otherwise = [name]
+            
+
+addExt :: Resource a -> T.Text -> Resource a
+addExt s@Resource{..} ext = s{resName = resName `addExtT` ext}
+
+addExtT :: T.Text -> T.Text -> T.Text
+addExtT name ext = T.intercalate "." [name,ext]
+
 
 {-
 
