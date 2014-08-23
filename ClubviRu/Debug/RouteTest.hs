@@ -1,5 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
-module ClubviRu.Debug.MainpageTest where
+module ClubviRu.Debog.RouteTest where
 import ClubviRu.Debug.Helpers
 import ClubviRu.Route
 import ClubviRu.Monad
@@ -14,3 +14,4 @@ test = process f $ S.fromList ["/index.htm", "/remember.htm"]
     f d = do
       (ss, ds) <- runDepRecord $ runClubviRu $ runPathHandler d clubviRoute
       return ds
+

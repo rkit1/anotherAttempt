@@ -30,6 +30,8 @@ instance (MonadState S m, MonadIO m, MonadError String m, Show si, Show di
 newtype ME m a = ME { runME :: m (Either E a) }
 
 
+
+
 data E = E (SourcePos,SourcePos) String deriving Show
 
 data StackElem = StackElem
@@ -109,8 +111,17 @@ a $=. b = b >>= \ b' -> a $= b'
 newtype M m a = M {runM' :: ME (StateT S m) a}
   deriving (Monad, MonadError String, MonadIO, MonadState S)
 
+instance MonadSiteIO si di m => MonadSiteIO si di (M m) where
+  openSI = lift . openSI
+  openDI = lift . openDI
+  doesExistSI = lift . doesExistSI
+  
+instance DepRecordMonad m si di => DepRecordMonad (M m) si di where
+  recordSI = lift . recordSI
+  recordDI = lift . recordDI
+
 instance MonadTrans M where
-  lift m = lift m
+  lift m = M $ lift $ lift m 
 
 runM :: Monad m => M m a -> m (Either E a)
 runM (M m) = evalStateT ( runME m ) $ 

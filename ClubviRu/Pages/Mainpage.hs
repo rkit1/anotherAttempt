@@ -35,9 +35,9 @@ a ! b = case M.lookup b a of Nothing -> error ("key not found: " ++ b)
 
 
 runMainPage
-  :: (IsString di, SiteConfig m, DepRecordMonad m SourcePath di,
-      MonadSiteIO SourcePath di m) =>
-     Int -> SourcePath -> di -> m ()
+  :: (DepRecordMonad m SP DP,
+      SiteConfig m, MonadSiteIO SP DP m) =>
+     Int -> SP -> DP -> m ()
 runMainPage pageNumber configPath outPath = do
   Right cfg <- parseConfig `liftM` IO.readString configPath
 
@@ -54,7 +54,7 @@ runMainPage pageNumber configPath outPath = do
     "leftcolumn" $=. processColumn =<< cfg ! "left"
     "rightcolumn" $=. processColumn =<< cfg ! "right"
     "news" $=. return news
-    callRTPL "/~templates/mainpage1.rtpl"
+    callRTPL (fromString "/~templates/mainpage1.rtpl")
 
   links <- filterLinks $ extractLinkStrings str
   forM_ links $ \ l -> recordDI $ fromString l
@@ -78,16 +78,16 @@ runMAndRecordSI m = do
     Left err -> $terror (show err)
 
 
-processColumn :: PTLMonad m => String -> m String
+processColumn :: PTLMonad SP DP m => String -> m String
 processColumn str = 
   let list = filter (not . all isSpace) $ lines str
   in liftM concat $ forM list $ \ item -> 
     case item of
       i | Just t <- stripPrefix "widget:" i -> do
-          callRTPL t
+          callRTPL (fromString t)
           callRTPL "/~templates/widget.rtpl"
         | Just t <- stripPrefix "raw:" i -> 
-          callRTPL t
+          callRTPL (fromString t)
         | otherwise -> return []
 --          error $ printf "processColumn: %s" i
 {-
