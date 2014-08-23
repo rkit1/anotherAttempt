@@ -16,7 +16,7 @@ linesToMap :: [Line] -> M.Map String String
 linesToMap ls = go M.empty ls
   where
     go map [] = map
-    go map (HeaderLine h:ls) = go (M.insert h (init str) map) tail
+    go map (HeaderLine h:ls) = go (M.insert h str map) tail
       where (str, tail) = collectRegulars ("", ls)
     collectRegulars (str, RegularLine rl:ls) = collectRegulars (str ++ rl, ls)
     collectRegulars x = x
