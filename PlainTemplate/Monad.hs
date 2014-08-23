@@ -15,10 +15,17 @@ import Data.Accessor.Monad.MTL.State ((%=),(%:))
 import qualified Data.Accessor.Monad.MTL.State as A
 import Data.Accessor.Template
 import Control.Exception as E
+import SiteGen.IO
+import SiteGen.Deps
+import Data.String
 
-
-class (MonadState S m, MonadIO m, MonadError String m) => PTLMonad m
-instance (MonadState S m, MonadIO m, MonadError String m) => PTLMonad m
+class (MonadState S m, MonadIO m, MonadError String m, Show si, Show di
+      , MonadSiteIO si di m, DepRecordMonad m si di, IsString si, IsString di)
+      => PTLMonad si di m
+      
+instance (MonadState S m, MonadIO m, MonadError String m, Show si, Show di
+         , MonadSiteIO si di m, DepRecordMonad m si di, IsString si, IsString di)
+         => PTLMonad si di m
 
 newtype ME m a = ME { runME :: m (Either E a) }
 
@@ -73,29 +80,29 @@ instance (Error a, MonadError a (ME m), MonadIO m) => MonadIO (ME m) where
       Left e -> throwError $ strMsg $ show (e :: SomeException)
       Right z -> return z
 
-lookupVar :: PTLMonad m => String -> m Variable
+lookupVar :: PTLMonad si di m => String -> m Variable
 lookupVar str = do
   Dictionary x <- A.get context
   case M.lookup str x of
     Just a -> return a
     Nothing -> throwError $ strMsg $ "Variable not found: " ++ str
 
-setVar :: PTLMonad m => String -> Variable -> m ()
+setVar :: PTLMonad si di m => String -> Variable -> m ()
 setVar nm var = context %: \ (Dictionary a) -> Dictionary $ M.insert nm var a
 
-updateVars :: PTLMonad m => Dictionary -> m ()
+updateVars :: PTLMonad si di m => Dictionary -> m ()
 updateVars (Dictionary a) = context %: \ (Dictionary b) -> Dictionary $ M.union a b
 
-recordDepend :: PTLMonad m => FilePath -> m ()
+recordDepend :: PTLMonad si di m => FilePath -> m ()
 recordDepend d = depends %: S.insert d
 
 infixr 0 $=
-($=) :: (Typeable a, PTLMonad m) => String -> a -> m ()
+($=) :: (Typeable a, PTLMonad si di m) => String -> a -> m ()
 ($=) n v = setVar n (Variable v)
 
 
 infixr 0 $=.
-($=.) :: (Typeable a, PTLMonad m)
+($=.) :: (Typeable a, PTLMonad si di  m)
   => String -> m a -> m ()
 a $=. b = b >>= \ b' -> a $= b'
 
