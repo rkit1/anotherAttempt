@@ -9,24 +9,48 @@ filterLinks :: SiteConfig m => [String] -> m [String]
 filterLinks links = do
   dmns <- myDomains
   let
-    f (Right ParseResult{..}) | Just _ <- find (== host) ("":dmns) = [path]
+    f (Right HTTP{..}) | Just _ <- find (== host) ("":dmns) = [path]
     f _ = []
-    parse str = parseString uRIP str str
+    parse str = parseString uriP str str
   return $ links >>= f . parse
-    
+
   
 
 
-data ParseResult = ParseResult
-  { host :: String
-  , path :: String }
+data ParseResult
+  = HTTP
+    { host :: String
+    , path :: String }
+  | Unknown
+    { scheme :: String
+    , content :: String }
   deriving Show
+
+setHost x@HTTP{..} h = x {host = h}
 
 [peggy|
 
-schemeP :: ()
-  = 'http://'
-  / '//'
+httpSchemeP :: ()
+  = 'http:' / 'https:'
+
+anySchemeP :: String
+  = [a-zA-Z]+ ':'
+
+uriP :: ParseResult
+  = httpSchemeP httpURIp { $2 }
+  / anySchemeP .+ { Unknown $1 $2 }
+  / httpURIp
+
+httpURIp :: ParseResult
+  = absoluteHttpURIp
+  / relativeHttpURIp
+
+relativeHttpURIp :: ParseResult
+  = pathP ('?' queryP)? ('#' fragmentP)? { HTTP "" $1 } 
+
+absoluteHttpURIp :: ParseResult
+  = '//' (authP '@')? hostP (':' portP)? relativeHttpURIp { setHost $4 $2 } 
+
 
 authP :: String
   = [^@]+
@@ -45,18 +69,6 @@ queryP :: String
 
 fragmentP :: String
   = .*
-
-uRIP :: ParseResult
-  = absoluteURIP 
-  / relativeURIP 
-
-
-relativeURIP :: ParseResult
-  = pathP ('?' queryP)? ('#' fragmentP)? { ParseResult "" $1 } 
-                     
-absoluteURIP :: ParseResult
-  = schemeP (authP '@')? hostP (':' portP)? pathP ('?' queryP)? ('#' fragmentP)?
-    { ParseResult $3 $5 }
 
 |] 
 
