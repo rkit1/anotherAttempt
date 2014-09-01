@@ -101,6 +101,17 @@ removeUps [] = []
 
 
 ----
+getExt :: Resource t -> T.Text
+getExt s@Resource{..} = getExtT resName
+
+getExtT :: T.Text -> T.Text
+getExtT name = ext
+  where
+    split = T.splitOn "." name
+    ext | x:y:xs <- split = last split
+        | otherwise = ""
+
+  
 changeExt :: Resource a -> T.Text -> Resource a
 changeExt s@Resource{..} ext = s{resName = resName `changeExtT` ext}
 

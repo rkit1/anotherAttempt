@@ -21,12 +21,11 @@ import PlainTemplate.Listing
 import PlainTemplate.Monad
 import PlainTemplate.Process
 import PlainTemplate.Variable
-import SiteGen.LinkExtractor
 import SiteGen.Deps
 import SiteGen.IO as IO
 import ClubviRu.Config.Parser
 import ClubviRu.Config.Site
-import ClubviRu.URIParser
+
 
 
 (!) :: Monad m => M.Map String a -> String -> m a
@@ -38,8 +37,8 @@ a ! b = case M.lookup b a of Nothing -> error ("key not found: " ++ b)
 runMainPage
   :: (DepRecordMonad m SP DP,
       SiteConfig m, MonadSiteIO SP DP m) =>
-     Int -> SP -> DP -> m ()
-runMainPage pageNumber configPath outPath = do
+     Int -> SP -> m String
+runMainPage pageNumber configPath = do
   Right cfg <- parseConfig `liftM` IO.readString configPath
 
   mid' <- cfg ! "mid"
@@ -57,11 +56,7 @@ runMainPage pageNumber configPath outPath = do
     "news" $=. return news
     callRTPL (fromString "/~templates/mainpage1.rtpl")
 
-  links <- filterLinks $ extractLinkStrings str
-  forM_ links $ \ l -> recordDI $ fromString l
-
-  writeString outPath str
-
+  return str
 
 
 

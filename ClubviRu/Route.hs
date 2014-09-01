@@ -17,6 +17,9 @@ import SiteGen.Deps
 import qualified Data.ByteString.Lazy as LBS
 import qualified Data.Text as T
 import Text.Printf
+import Data.String
+import ClubviRu.URIParser
+import SiteGen.LinkExtractor
 
 
 ----
@@ -24,6 +27,14 @@ newtype PathHandler m a =
   PH { runPH :: ErrorT String (StateT (Resource Destination) m) a }
     deriving (Monad, MonadPlus, MonadIO)
 
+runPathHandler input (PH a) = do
+  runStateT (runErrorT a) input
+  return ()
+
+instance Monad m => MonadState DP (PathHandler m) where
+  get = PH get
+  put s = PH $ put s
+  
 instance MonadTrans PathHandler where
   lift m = PH $ lift $ lift m
 
@@ -32,96 +43,87 @@ instance MonadSiteIO si di m => MonadSiteIO si di (PathHandler m) where
   openDI = lift . openDI
   doesExistSI = lift . doesExistSI
 
-runPathHandler input (PH a) = do
-  runStateT (runErrorT a) input
-  return ()
+instance SiteConfig m => SiteConfig (PathHandler m) where
+  sourceRoot = lift sourceRoot
+  destinationRoot = lift destinationRoot
+  myDomains = lift myDomains
+  
+instance DepRecordMonad m SP DP => DepRecordMonad (PathHandler m) SP DP where
+  recordSI = lift . recordSI
+  recordDI = lift . recordDI
 
-----
-end :: Monad m => PathHandler m ()
-end = do
-  r@Resource{resPath = []} <- PH get
-  return ()
+class
+  ( DepRecordMonad m SP DP
+  , SiteConfig m
+  , MonadSiteIO SP DP m
+  , MonadPlus m
+  , MonadState DP m) 
+  => PathHandlerM m
 
-anySegment :: Monad m => PathHandler m T.Text
-anySegment = PH $ do
-  r@Resource{resPath = (x:xs)} <- get
-  put r{resPath = xs}
-  return x
-               
-segment :: Monad m => T.Text -> PathHandler m ()
-segment s = do
-  x <- anySegment
-  guard $ x == s
-
-lastSegment :: Monad m => PathHandler m T.Text
-lastSegment = do
-  s <- anySegment
-  end
-  return s
-
-dirSegment :: Monad m => PathHandler m T.Text
-dirSegment = do
-  s <- anySegment
-  r@Resource{resPath = (_:_)} <- PH get
-  return s
-    
-
-----
-clubviRoute :: 
+instance
   ( DepRecordMonad m SP DP
   , SiteConfig m
   , MonadSiteIO SP DP m ) 
-  => PathHandler m ()
+  => PathHandlerM (PathHandler m)
+
+
+----
+clubviRoute :: (PathHandlerM m) => m ()
 clubviRoute = msum
   [ exactFile >> depFile
   , mainPage >> depFile
-  , unhandled
-  ] 
+  , unhandled ] 
   where
     unhandled = do
-      d <- PH get
+      d <- get
       liftIO $ printf "unhandled desination: %s\n" (show d)
 
-
-mainPage ::
-  ( DepRecordMonad m SP DP
-  , MonadSiteIO SP DP m
-  , SiteConfig m ) 
-  => PathHandler m ()
+mainPage :: (PathHandlerM m) => m ()
 mainPage = do
-  d@Resource{..} <- PH get
+  d@Resource{..} <- get
   let s = Resource{resName = resName `changeExtT` "mp", .. }
   doesExistSI s >>= guard
-  lift $ runMainPage 0 s d
+  str <- runMainPage 0 s
+  recordHtmlLinks str d
+  writeString d str
 
-exactFile :: 
-  ( DepRecordMonad m SP DP
-  , MonadSiteIO SP DP m ) 
-  => PathHandler m ()
+exactFile :: (PathHandlerM m) => m ()
 exactFile = do
-  d@Resource{..} <- PH get
+  d@Resource{..} <- get
   let s = Resource{..}
   doesExistSI s >>= guard
-  lift $ do
-    hs <- openSI s
-    hd <- openDI d
-    cts <- liftIO $  LBS.hGetContents hs
-    liftIO $ LBS.hPutStr hd cts
+  msum
+    [ copyHtmlAndRecord s d
+    , copyAnything s d ]
 
-depFile ::
-  ( DepRecordMonad m SP DP
-  , MonadSiteIO SP DP m ) 
-  => PathHandler m ()
+depFile :: (PathHandlerM m) => m ()
 depFile = do
-  d@Resource{..} <- PH get
+  d@Resource{..} <- get
   let s = Resource{..}
   let df = s `addExt` "deps"
   ( do
     doesExistSI df >>= guard
-    lift $ do
-      deps <- readDepFile  df
-      forM_ deps $ \ dep -> recordDI $ dep `relativeTo` d
+    deps <- readDepFile df
+    forM_ deps $ \ dep -> recordDI $ dep `relativeTo` d
     ) `mplus` return ()
 
+----
+copyHtmlAndRecord :: (PathHandlerM m) => SP -> DP -> m ()
+copyHtmlAndRecord s d = do
+  guard $ getExt d == "htm"
+  str <- readString s
+  writeString d str
+  recordHtmlLinks str d
+    
+
+copyAnything :: (PathHandlerM m) => SP -> DP -> m ()
+copyAnything s d = do
+  str <- readByteStringL s
+  writeByteStringL d str
 
 
+----
+recordHtmlLinks :: (PathHandlerM m) => String -> DP -> m ()
+recordHtmlLinks str dp = do
+  links <- filterLinks $ extractLinkStrings str
+  forM_ links $ \ l -> recordDI $ fromString l `relativeTo` dp
