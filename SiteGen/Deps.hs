@@ -1,5 +1,6 @@
-{-# LANGUAGE ScopedTypeVariables, BangPatterns, MultiParamTypeClasses, 
-  FunctionalDependencies, GeneralizedNewtypeDeriving, FlexibleInstances #-}
+{-# LANGUAGE ScopedTypeVariables, BangPatterns, MultiParamTypeClasses
+ , FunctionalDependencies, GeneralizedNewtypeDeriving, FlexibleInstances
+ , UndecidableInstances #-}
 module SiteGen.Deps where
 import qualified Data.Set as S
 import Control.Monad.State.Strict
@@ -13,7 +14,7 @@ import qualified Data.Map.Strict as M
 ----
 -- run everything
 ----
-
+{-
 runEverything
   :: (Monad m, Ord si, Ord di, Ord t) 
   => (si -> m t)                            -- ^ Check time
@@ -23,7 +24,7 @@ runEverything
   -> M.Map di (t, S.Set si, S.Set di)       -- ^ Initial memo table
   -> m (M.Map di (t, S.Set si, S.Set di))   -- ^ Resulting memo table
 runEverything cht cut pr initD initT = runTime cht cut $ runDepDB $ process (runDepRecordAndReport pr) initD
-
+-}
 ----
 -- main loop
 ----
@@ -62,14 +63,13 @@ newtype DepRecord si di m a = DepRecord (StateT (S.Set si, S.Set di) m a)
 runDepRecord :: Monad m => DepRecord si di m a -> m (S.Set si, S.Set di)
 runDepRecord (DepRecord m) = execStateT m (S.empty, S.empty)
 
-runDepRecordAndReport :: (Monad m, Ord si, Ord di, Ord t) 
-  => (di -> DepRecord si di m a) 
-  -> di 
-  -> DepDB si di t (Time si t m) (S.Set di)
+runDepRecordAndReport
+  :: (Ord t, TimeMonad m si t, DepDBMonad m si di t) =>
+     (di -> DepRecord si di m a) -> di -> m (S.Set di)
 runDepRecordAndReport f di = do
   deps <- lookupDeps di
   let doit = do 
-        (ss, dd) <- lift $ lift $ runDepRecord (f di)
+        (ss, dd) <- runDepRecord (f di)
         t <- curTime 
         recordDeps di t ss dd
         return dd
@@ -83,11 +83,21 @@ runDepRecordAndReport f di = do
 -- DepDB
 ----
 
-newtype DepDB si di t m a = DepDB (StateT (M.Map di (t, S.Set si, S.Set di)) m a)
+type DepDBType si di t = (M.Map di (t, S.Set si, S.Set di))
+emptyDDBType = M.empty
+
+newtype DepDB si di t m a = DepDB (StateT (DepDBType si di t) m a)
   deriving (Monad, MonadIO, MonadTrans)
 
-runDepDB :: (Monad m, Ord si, Ord di) => DepDB si di t m a -> m (M.Map di (t, S.Set si, S.Set di))
-runDepDB (DepDB m) = execStateT m M.empty
+instance DepDBMonad m si di t => DepDBMonad (Time si t m) si di t where
+  recordDeps d t ss ds = lift $ recordDeps d t ss ds
+  lookupDeps d = lift $ lookupDeps d
+
+
+
+runDepDB :: (Monad m, Ord si, Ord di)
+  => (DepDBType si di t) -> DepDB si di t m a -> m (DepDBType si di t)
+runDepDB i (DepDB m) = execStateT m i
 
 class Monad m => DepDBMonad m si di t | m -> si di t where 
   recordDeps :: di -> t -> S.Set si -> S.Set di -> m ()

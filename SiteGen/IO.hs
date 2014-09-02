@@ -1,4 +1,4 @@
-{-# LANGUAGE MultiParamTypeClasses, RecordWildCards, FlexibleInstances, GeneralizedNewtypeDeriving, FunctionalDependencies #-}
+{-# LANGUAGE MultiParamTypeClasses, RecordWildCards, FlexibleInstances, GeneralizedNewtypeDeriving, FunctionalDependencies, UndecidableInstances #-}
 module SiteGen.IO where
 import System.IO
 import Control.Monad.Reader
@@ -12,6 +12,11 @@ class MonadIO m => MonadSiteIO si di m | m -> si di where
   doesExistSI :: si -> m Bool
 
 instance MonadSiteIO si di m => MonadSiteIO si di (DepRecord si di m) where
+  openSI = lift . openSI
+  openDI = lift . openDI
+  doesExistSI = lift . doesExistSI
+
+instance MonadSiteIO si di m => MonadSiteIO si di (Time si t m) where
   openSI = lift . openSI
   openDI = lift . openDI
   doesExistSI = lift . doesExistSI
