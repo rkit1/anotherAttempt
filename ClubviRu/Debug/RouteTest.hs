@@ -12,16 +12,14 @@ import qualified Data.Map as M
 import ClubviRu.Config.Site
 import Control.Monad.Trans
 import SiteGen.IO
-
+import ClubviRu.Storage
 
 test :: MonadIO m => m ()
 test = do
-  t <- runDepDB emptyDDBType $ runClubviRu $ runClubviTime
+  runClubviRu $ runClubviTime $ runAcidDepDB
     $ process (runDepRecordAndReport $ \ d -> runPathHandler d clubviRoute)
     $ S.fromList ["/index.htm", "/remember.htm"]
-  liftIO
-    $ writeFile "c:/Users/Victor/Documents/wrk/newsite/anotherAttempt/graph"
-    $ show t
+  return ()
 
 -- runDepDB
 

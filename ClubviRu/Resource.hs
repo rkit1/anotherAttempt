@@ -1,10 +1,10 @@
-{-# LANGUAGE OverloadedStrings, RecordWildCards #-}
+{-# LANGUAGE OverloadedStrings, RecordWildCards, DeriveDataTypeable #-}
 module ClubviRu.Resource where
 import qualified Data.Text as T
 import Data.String
 import ClubviRu.Config.Site
 import Control.Monad.Error
-
+import Data.Data
 
 ----
 type SourcePath = Resource Source
@@ -14,7 +14,9 @@ type DP = Resource Destination
 
 
 data Source
+  deriving (Typeable)
 data Destination
+  deriving (Typeable)
 
 class ResType r where
   resRoot :: SiteConfig m => Resource r -> m FilePath
@@ -29,10 +31,10 @@ data Resource a = Resource
   { resPathType :: ResPathType
   , resPath :: [T.Text]
   , resName :: T.Text
-  } deriving (Show, Eq, Ord)
+  } deriving (Show, Eq, Ord, Typeable, Data)
 
 data ResPathType = Relative | Absolute 
-  deriving (Show, Eq, Ord)
+  deriving (Show, Eq, Ord, Typeable, Data)
 
 instance IsString (Resource a) where
   fromString str = Resource{..}

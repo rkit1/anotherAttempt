@@ -48,8 +48,10 @@ instance (MonadIO m) =>
 
 
 instance Monad m => SiteConfig (ClubviRuMonad m) where
-    sourceRoot = 
-        return "c:/Users/Victor/Documents/wrk/newsite/anotherAttemptSource/"
-    destinationRoot = 
-        return "c:/Users/Victor/Documents/wrk/newsite/anotherAttemptDestination/"
-    myDomains = return ["clubvi.ru", "www.clubvi.ru"]
+  sourceRoot = 
+    return "c:/Users/Victor/Documents/wrk/newsite/anotherAttemptSource/"
+  destinationRoot = 
+    return "c:/Users/Victor/Documents/wrk/newsite/anotherAttemptDestination/"
+  storeRoot = 
+    return "c:/Users/Victor/Documents/wrk/newsite/anotherAttemptStore/"
+  myDomains = return ["clubvi.ru", "www.clubvi.ru"]

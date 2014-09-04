@@ -46,6 +46,7 @@ instance MonadSiteIO si di m => MonadSiteIO si di (PathHandler m) where
 instance SiteConfig m => SiteConfig (PathHandler m) where
   sourceRoot = lift sourceRoot
   destinationRoot = lift destinationRoot
+  storeRoot = lift storeRoot
   myDomains = lift myDomains
   
 instance DepRecordMonad m SP DP => DepRecordMonad (PathHandler m) SP DP where
