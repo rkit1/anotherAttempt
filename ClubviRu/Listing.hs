@@ -1,18 +1,17 @@
 {-# LANGUAGE RecordWildCards, TemplateHaskell #-}
-module PlainTemplate.Listing where
+module ClubviRu.Listing where
 import Text.Parsec
 import Library
 import System.Time
 import qualified Data.Map as M
 import Data.Binary
---import qualified Store as S
 
 data Date 
   = Date
     { dYear :: Int 
     , dMonth :: Month }
   | NullDate
-    deriving (Eq, Ord)
+    deriving (Eq, Ord, Show)
 
 instance Binary Date where
   put Date{..} = do
@@ -65,15 +64,13 @@ groupByMonths ps = M.toDescList m
       a <- replicateM 2 digit
       return $ toEnum $ read a - 1
 
-readListing :: MonadIO m => FilePath -> m [String]
-readListing listing = liftIO $ lines `liftM` readFile listing 
-
 fileNameFromDate :: FilePath -> Date -> FilePath
 fileNameFromDate prefix d = printf "%s/%s.htm" prefix (showDate d)
 
 
 
-
-{-test = do
-  a <- readFile "x:/~listings/index"
-  print $ groupByMonths $ lines a-}
+{-
+test = do
+  a <- readFile "x:/~listings/remember"
+  forM_ (groupByMonths $ lines a) print
+-}

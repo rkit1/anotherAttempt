@@ -20,6 +20,3 @@ test = do
     $ process (runDepRecordAndReport $ \ d -> runPathHandler d clubviRoute)
     $ S.fromList ["/index.htm", "/remember.htm"]
   return ()
-
--- runDepDB
-

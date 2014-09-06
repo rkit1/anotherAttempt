@@ -103,6 +103,18 @@ removeUps [] = []
 
 
 ----
+getName :: Resource t -> T.Text
+getName s@Resource{..} = getNameT resName
+
+
+getNameT :: T.Text -> T.Text
+getNameT name = n
+  where
+    split = T.splitOn "." name
+    n | x:xs <- split = T.intercalate "." $ init split
+      | otherwise = ""
+
+    
 getExt :: Resource t -> T.Text
 getExt s@Resource{..} = getExtT resName
 
