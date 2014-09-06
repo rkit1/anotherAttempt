@@ -1,4 +1,5 @@
-{-# LANGUAGE FlexibleContexts, OverloadedStrings, TemplateHaskell #-}
+{-# LANGUAGE FlexibleContexts, OverloadedStrings, TemplateHaskell
+  , RecordWildCards #-}
 module ClubviRu.Pages.Mainpage where
 import ClubviRu.Config.Parser (parseConfigFile)
 --import Path.Destination
@@ -17,7 +18,7 @@ import SiteGen.Deps
 import qualified Data.Accessor.Monad.MTL.State as A
 import qualified Data.Set as S
 import qualified PlainTemplate.Variable as V
-import PlainTemplate.Listing
+import ClubviRu.Listing
 import PlainTemplate.Monad
 import PlainTemplate.Process
 import PlainTemplate.Variable
@@ -25,6 +26,7 @@ import SiteGen.Deps
 import SiteGen.IO as IO
 import ClubviRu.Config.Parser
 import ClubviRu.Config.Site
+import Text.Printf
 
 
 
@@ -33,21 +35,34 @@ a ! b = case M.lookup b a of Nothing -> error ("key not found: " ++ b)
                              Just a -> return $! a
 
 
-
-runMainPage
-  :: (DepRecordMonad m SP DP,
-      SiteConfig m, MonadSiteIO SP DP m) =>
-     Int -> SP -> m String
-runMainPage pageNumber configPath = do
+runMainPage ::
+  ( DepRecordMonad m SP DP
+  , SiteConfig m, MonadSiteIO SP DP m)
+  => Maybe Date -> SP -> m String
+runMainPage pageDate configPath@Resource{..} = do
   Right cfg <- parseConfig `liftM` IO.readString configPath
 
   mid' <- cfg ! "mid"
   let mid = filter (not . all isSpace) $ lines mid'
-      myChunk = take 50 $ drop (50*pageNumber) mid
+      months = groupByMonths mid
+      myChunk | Just d <- pageDate = case lookup d months of
+                Nothing -> $terror "runMainPage: imposible: date not found"
+                Just a -> a
+              | otherwise = take 50 mid
+      archiveLink = Resource
+        { resPathType = Relative
+        , resPath = ["archive", getName configPath]
+        , resName = fromString ((showDate $ fst $ head months) ++ ".htm") }
 
-  news <- forM myChunk $ \ x -> do
+
+      archiveLinkString :: String
+      archiveLinkString = printf "<p><a href=\"%s\">Архив</a></p>"
+        $ toFilePath "" archiveLink
+
+  news' <- forM myChunk $ \ x -> do
     x' <- readHead $ "~head.htm.src" `relativeTo` fromString x 
     return $ mkDictionary [ ("content", Variable x' ) ]  
+  let news = news' ++ [mkDictionary [ ("content", Variable archiveLinkString ) ]]
 
   str <- runMAndRecordSI $ do
     "title" $=. cfg ! "title"

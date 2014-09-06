@@ -84,7 +84,7 @@ mainPage = do
   d@Resource{..} <- get
   let s = Resource{resName = resName `changeExtT` "mp", .. }
   doesExistSI s >>= guard
-  str <- runMainPage 0 s
+  str <- runMainPage Nothing s
   recordHtmlLinks str d
   writeString d str
 
