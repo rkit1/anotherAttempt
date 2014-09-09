@@ -7,6 +7,7 @@ import ClubviRu.Resource
 import ClubviRu.Debug.Helpers
 import ClubviRu.Pages.Mainpage
 import ClubviRu.DepFile
+import ClubviRu.Listing
 import System.Directory
 import Control.Monad.Trans
 import Control.Monad.Cont
@@ -71,8 +72,9 @@ instance
 ----
 clubviRoute :: (PathHandlerM m) => m ()
 clubviRoute = msum
-  [ exactFile >> depFile
-  , mainPage >> depFile
+  [ exactFile
+  , archive
+  , mainPage
   , unhandled ] 
   where
     unhandled = do
@@ -87,6 +89,17 @@ mainPage = do
   str <- runMainPage Nothing s
   recordHtmlLinks str d
   writeString d str
+  depFile
+
+archive :: PathHandlerM m => m ()
+archive = do
+  d@Resource{resPath = ("archive":path), ..} <- get
+  let s = Resource{resName = last path `changeExtT` "mp", resPath = init path, ..}
+  doesExistSI s >>= guard
+  date <- readDate $ T.unpack resName
+  str <- runMainPage (Just date) s
+  recordHtmlLinks str d
+  writeString d str
 
 exactFile :: (PathHandlerM m) => m ()
 exactFile = do
@@ -96,7 +109,8 @@ exactFile = do
   msum
     [ copyHtmlAndRecord s d
     , copyAnything s d ]
-
+  depFile
+  
 depFile :: (PathHandlerM m) => m ()
 depFile = do
   d@Resource{..} <- get
@@ -107,6 +121,9 @@ depFile = do
     deps <- readDepFile df
     forM_ deps $ \ dep -> recordDI $ dep `relativeTo` d
     ) `mplus` return ()
+
+
+
 
 ----
 copyHtmlAndRecord :: (PathHandlerM m) => SP -> DP -> m ()

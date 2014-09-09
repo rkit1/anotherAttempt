@@ -32,21 +32,48 @@ instance Binary Month where
   put m = putWord8 $ fromIntegral $ fromEnum m
   get = (toEnum . fromIntegral) `liftM` getWord8
 
+readDate :: MonadPlus m => String -> m Date
+readDate str = case parse (n `mplus` m) str str of
+  Left err -> mzero
+  Right res -> return res
+  where
+    n = do
+      try $ string $ showDate NullDate
+      return NullDate
+    m = do
+      dMonth <- msum $ flip map months
+        $ \ (c, n) -> try (string n) >> return c
+      char ' '
+      dYear <- liftM read $ replicateM 4 digit
+      string "г."
+      return Date{..}
+
+pt str m = parse m str str
+
 showDate Date{..} = printf "%s %dг." (showMonth dMonth) dYear
 showDate NullDate = "Дата неизвестна"
-                    
-showMonth January   = "Январь"
-showMonth February  = "Февраль"
-showMonth March     = "Март"
-showMonth April     = "Апрель"
-showMonth May       = "Май"
-showMonth June      = "Июнь"
-showMonth July      = "Июль"
-showMonth August    = "Август"
-showMonth September = "Сентябрь"
-showMonth October   = "Октябрь"
-showMonth November  = "Ноябрь"
-showMonth December  = "Декабрь"
+
+showMonth :: Month -> String
+showMonth m = a
+  where
+    Just a = lookup m months
+
+months :: [(Month, String)]
+months =
+  [ January   % "Январь" 
+  , February  % "Февраль" 
+  , March     % "Март" 
+  , April     % "Апрель" 
+  , May       % "Май" 
+  , June      % "Июнь" 
+  , July      % "Июль" 
+  , August    % "Август" 
+  , September % "Сентябрь" 
+  , October   % "Октябрь" 
+  , November  % "Ноябрь" 
+  , December  % "Декабрь" ]
+  where
+    (%) = (,)
 
 groupByMonths :: [FilePath] -> [(Date,[FilePath])]
 groupByMonths ps = M.toDescList m
@@ -64,8 +91,8 @@ groupByMonths ps = M.toDescList m
       a <- replicateM 2 digit
       return $ toEnum $ read a - 1
 
-fileNameFromDate :: FilePath -> Date -> FilePath
-fileNameFromDate prefix d = printf "%s/%s.htm" prefix (showDate d)
+--fileNameFromDate :: FilePath -> Date -> FilePath
+--fileNameFromDate prefix d = printf "%s/%s.htm" prefix (showDate d)
 
 
 
