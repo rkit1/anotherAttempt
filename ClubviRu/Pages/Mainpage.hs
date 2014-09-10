@@ -17,7 +17,6 @@ import Library
 import SiteGen.Deps
 import qualified Data.Accessor.Monad.MTL.State as A
 import qualified Data.Set as S
-import qualified PlainTemplate.Variable as V
 import ClubviRu.Listing
 import PlainTemplate.Monad
 import PlainTemplate.Process
@@ -31,7 +30,7 @@ import Text.Printf
 
 
 (!) :: Monad m => M.Map String a -> String -> m a
-a ! b = case M.lookup b a of Nothing -> error ("key not found: " ++ b)
+a ! b = case M.lookup b a of Nothing -> $terror ("key not found: " ++ b)
                              Just a -> return $! a
 
 
@@ -49,27 +48,35 @@ runMainPage pageDate configPath@Resource{..} = do
                 Nothing -> $terror "runMainPage: imposible: date not found"
                 Just a -> a
               | otherwise = take 50 mid
-      archiveLink = Resource
-        { resPathType = Relative
+      archiveLink m = Resource
+        { resPathType = Absolute
         , resPath = ["archive", getName configPath]
-        , resName = fromString ((showDate $ fst $ head months) ++ ".htm") }
+        , resName = fromString (showDate m ++ ".htm") }
 
 
-      archiveLinkString :: String
-      archiveLinkString = printf "<p><a href=\"%s\">Архив</a></p>"
-        $ toFilePath "" archiveLink
+      archiveLinkString :: DP -> String -> String
+      archiveLinkString l n = printf "<p><a href=\"%s\">%s</a></p>"
+        (toFilePath "" l) n 
 
   news' <- forM myChunk $ \ x -> do
-    x' <- readHead $ "~head.htm.src" `relativeTo` fromString x 
+    x' <- readHeadU $ fromString x 
     return $ mkDictionary [ ("content", Variable x' ) ]  
-  let news = news' ++ [mkDictionary [ ("content", Variable archiveLinkString ) ]]
+  let news = news' ++ [ mkDictionary [ ("content", Variable archiveMainLink ) ]
+                      | pageDate == Nothing ]
+      archiveMainLink = archiveLinkString (archiveLink (fst $ head months)) "Архив"
 
+  let right
+        | Just d <- pageDate = return $ concat
+          [ archiveLinkString (archiveLink m) (showDate m)
+          | (m,_) <- months ]
+        | otherwise = processColumn =<< cfg ! "right"
+  
   str <- runMAndRecordSI $ do
     "title" $=. cfg ! "title"
     "leftcolumn" $=. processColumn =<< cfg ! "left"
-    "rightcolumn" $=. processColumn =<< cfg ! "right"
+    "rightcolumn" $=. right
     "news" $=. return news
-    callRTPL (fromString "/~templates/mainpage1.rtpl")
+    callRTPL "/~templates/mainpage1.rtpl"
 
   return str
 
