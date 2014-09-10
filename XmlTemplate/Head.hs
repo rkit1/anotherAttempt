@@ -1,4 +1,5 @@
-{-# LANGUAGE RecordWildCards, QuasiQuotes, OverloadedStrings, FlexibleContexts #-}
+{-# LANGUAGE RecordWildCards, QuasiQuotes, OverloadedStrings, FlexibleContexts
+  , TemplateHaskell #-}
 module XmlTemplate.Head where
 
 --import MainMonad
@@ -15,9 +16,9 @@ import Control.Monad.Trans
 import ClubviRu.Resource
 import SiteGen.Deps
 import Data.Knob
+import ClubviRu.Debug.Helpers
 
-readHead :: (DepRecordMonad m SourcePath di, MonadSiteIO SourcePath di m) =>
-     SourcePath -> m String
+readHead :: (DepRecordMonad m SP di, MonadSiteIO SP di m) => SP -> m String
 readHead src = do
   let path = pathToString src
   s <- IO.readByteString src
@@ -35,4 +36,16 @@ readHead src = do
     last out `seq` hClose h
     return out
 
-
+readHeadU :: (DepRecordMonad m SP di, MonadSiteIO SP di m)
+  => SP -> m String
+readHeadU src = do
+  let head = "~head.htm.src" `relativeTo` src
+      headL = "~head.htm" `relativeTo` src
+  h <- doesExistSI head
+  if h
+    then readHead head
+    else do
+      hl <- doesExistSI headL
+      if hl
+        then IO.readString headL
+        else $terror (pathToString src ++ ": no head file")
