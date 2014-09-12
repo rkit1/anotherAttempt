@@ -26,11 +26,13 @@ import SiteGen.LinkExtractor
 ----
 newtype PathHandler m a =
   PH { runPH :: ErrorT String (StateT (Resource Destination) m) a }
-    deriving (Monad, MonadPlus, MonadIO)
+    deriving (Monad, MonadPlus, MonadIO, MonadError String)
 
+runPathHandler :: Monad m
+  => DP -> PathHandler m a -> m (Either String a)
 runPathHandler input (PH a) = do
-  runStateT (runErrorT a) input
-  return ()
+  evalStateT (runErrorT a) input
+
 
 instance Monad m => MonadState DP (PathHandler m) where
   get = PH get
@@ -59,13 +61,14 @@ class
   , SiteConfig m
   , MonadSiteIO SP DP m
   , MonadPlus m
-  , MonadState DP m) 
+  , MonadState DP m
+  , MonadError String m)
   => PathHandlerM m
 
 instance
   ( DepRecordMonad m SP DP
   , SiteConfig m
-  , MonadSiteIO SP DP m ) 
+  , MonadSiteIO SP DP m )
   => PathHandlerM (PathHandler m)
 
 
@@ -75,11 +78,11 @@ clubviRoute = msum
   [ exactFile
   , archive
   , mainPage
-  , unhandled ] 
+  ] `mplus` unhandled
   where
     unhandled = do
       d <- get
-      liftIO $ printf "unhandled desination: %s\n" (show d)
+      throwError $ printf "unhandled desination: %s" (show d)
 
 mainPage :: (PathHandlerM m) => m ()
 mainPage = do

@@ -60,37 +60,48 @@ instance (Monad m, Ord si, Ord di) => DepRecordMonad (DepRecord si di m) si di w
 newtype DepRecord si di m a = DepRecord (StateT (S.Set si, S.Set di) m a)
   deriving (Monad, MonadIO, MonadTrans)
 
-runDepRecord :: Monad m => DepRecord si di m a -> m (S.Set si, S.Set di)
-runDepRecord (DepRecord m) = execStateT m (S.empty, S.empty)
+runDepRecord :: Monad m
+  => DepRecord si di m (Maybe String)
+     -> m (Either String (S.Set si, S.Set di))
+runDepRecord (DepRecord m) = do
+  (a, sets) <- runStateT m (S.empty, S.empty)
+  case a of
+    Nothing ->  return $ Right (sets)
+    Just err -> return $ Left err
 
 runDepRecordAndReport
   :: (Ord t, TimeMonad m si t, DepDBMonad m si di t) =>
-     (di -> DepRecord si di m a) -> di -> m (S.Set di)
+     (di -> DepRecord si di m (Maybe String)) -> di -> m (S.Set di)
 runDepRecordAndReport f di = do
   deps <- lookupDeps di
-  let doit = do 
-        (ss, dd) <- runDepRecord (f di)
+  let doit = do
+        res <- runDepRecord (f di)
         t <- curTime 
-        recordDeps di t ss dd
-        return dd
+        case res of
+          Left err -> do
+            recordDeps di $ Left err
+            return S.empty
+          Right (ss, dd) -> do
+            recordDeps di $ Right (t, ss, dd)
+            return dd
   case deps of
-    Nothing -> doit
-    Just (t, ss, dd) -> do
+    Just (Right (t, ss, dd)) -> do
       c <- checkForChanges t ss
       if c then doit else return dd
+    _ -> doit
 
 ----
 -- DepDB
 ----
 
-type DepDBType si di t = (M.Map di (t, S.Set si, S.Set di))
+type DepDBType si di t = (M.Map di (Either String (t, S.Set si, S.Set di)))
 emptyDDBType = M.empty
 
 newtype DepDB si di t m a = DepDB (StateT (DepDBType si di t) m a)
   deriving (Monad, MonadIO, MonadTrans)
 
 instance DepDBMonad m si di t => DepDBMonad (Time si t m) si di t where
-  recordDeps d t ss ds = lift $ recordDeps d t ss ds
+  recordDeps d dt = lift $ recordDeps d dt
   lookupDeps d = lift $ lookupDeps d
 
 
@@ -100,11 +111,11 @@ runDepDB :: (Monad m, Ord si, Ord di)
 runDepDB i (DepDB m) = execStateT m i
 
 class Monad m => DepDBMonad m si di t | m -> si di t where 
-  recordDeps :: di -> t -> S.Set si -> S.Set di -> m ()
-  lookupDeps :: di -> m (Maybe (t, S.Set si, S.Set di))
+  recordDeps :: di -> Either String (t, S.Set si, S.Set di) -> m ()
+  lookupDeps :: di -> m (Maybe (Either String (t, S.Set si, S.Set di)))
 
 instance (Monad m, Ord si, Ord di) => DepDBMonad (DepDB si di t m) si di t where
-  recordDeps di t ss dd = DepDB $ modify $ M.insert di (t, ss, dd)
+  recordDeps di dt = DepDB $ modify $ M.insert di dt
   lookupDeps di = DepDB $ gets $ M.lookup di
 
 ----
@@ -117,7 +128,7 @@ class Monad m => TimeMonad m si t | m -> si t where
 
 instance TimeMonad m si t => TimeMonad (DepDB si di t m) si t where
   checkTime si = lift $ checkTime si
-  curTime = lift $ curTime
+  curTime = lift curTime
 
 instance (Monad m, Ord si) => TimeMonad (Time si t m) si t where
   curTime = Time $ gets curTime_ >>= \ x -> lift x
@@ -129,17 +140,17 @@ instance (Monad m, Ord si) => TimeMonad (Time si t m) si t where
         t <- lift $ checkTime_ x si
         put x{memoMap = M.insert si t $ memoMap x}
         return t
-        
 
 newtype Time si t m a = Time (StateT (TimeState si t m) m a)
   deriving (Monad, MonadIO)
 
 runTime :: (Monad m, Ord si) => (si -> m t) -> (m t) -> Time si t m a -> m a
-runTime cht cut (Time m) = evalStateT m st
-  where st = TimeState
-             { memoMap = M.empty
-             , checkTime_ = cht
-             , curTime_ = cut }
+runTime cht cut (Time m) = 
+  evalStateT m TimeState
+    { memoMap = M.empty
+    , checkTime_ = cht
+    , curTime_ = cut }
+
 
 checkForChanges :: (Ord t, TimeMonad m si t) => t -> S.Set si -> m Bool
 checkForChanges t ss = do
@@ -158,3 +169,4 @@ data TimeState si t m = TimeState
   { memoMap :: !(M.Map si t)
   , checkTime_ :: si -> m t
   , curTime_ :: m t }
+  

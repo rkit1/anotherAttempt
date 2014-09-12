@@ -21,7 +21,7 @@ instance (MonadIO m, DepRecordMonad m si di) =>
 
 
 instance DepDBMonad m si di t => DepDBMonad (ClubviRuMonad m) si di t where
-  recordDeps d t ss ds = lift $ recordDeps d t ss ds
+  recordDeps d dt = lift $ recordDeps d dt
   lookupDeps d = lift $ lookupDeps d
 
 

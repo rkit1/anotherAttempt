@@ -14,6 +14,7 @@ import Data.Acid
 import Data.SafeCopy
 import qualified Data.Map as M
 import qualified Data.Set as S
+import Data.Data
 
 newtype AcidDepDB m a = AcidDepDB { unADD :: AcidState DB -> m a}
 
@@ -47,17 +48,21 @@ instance MonadTrans AcidDepDB where
 instance MonadIO m => MonadIO (AcidDepDB m) where
   liftIO m = lift $ liftIO m
 
-recordDeps_ :: DP -> UTCTime -> S.Set SP -> S.Set DP -> Update DB ()
-recordDeps_ di t ss dd = do
+recordDeps_ :: DP -> Either String (UTCTime, S.Set SP, S.Set DP) -> Update DB ()
+recordDeps_ di dt = do
   DB a <- get
-  put $ DB $ M.insert di (t, ss, dd) a
+  put $ DB $ M.insert di dt a
   
-lookupDeps_ :: DP -> Query DB (Maybe (UTCTime, S.Set SP, S.Set DP))
+lookupDeps_ :: DP -> Query DB (Maybe (Either String (UTCTime, S.Set SP, S.Set DP)))
 lookupDeps_ di = do
   DB a <- ask
   return $ M.lookup di a
-  
+
+dumpDB :: Query DB DB
+dumpDB = ask
+
 newtype DB = DB (DepDBType SP DP UTCTime)
+  deriving (Typeable, Show)
 
 instance SafeCopy Source where
   putCopy _ = undefined
@@ -69,11 +74,11 @@ instance SafeCopy Destination where
 $(deriveSafeCopy 0 'base ''ResPathType)
 $(deriveSafeCopy 0 'base ''Resource)
 $(deriveSafeCopy 0 'base ''DB)
-$(makeAcidic ''DB ['recordDeps_, 'lookupDeps_])
+$(makeAcidic ''DB ['recordDeps_, 'lookupDeps_, 'dumpDB])
 
 instance MonadIO m => DepDBMonad (AcidDepDB m) SP DP UTCTime where
-  recordDeps di t ss dd = AcidDepDB $ \ r -> do
-    liftIO $ update r $ RecordDeps_ di t ss dd
+  recordDeps di dt = AcidDepDB $ \ r -> do
+    liftIO $ update r $ RecordDeps_ di dt
   lookupDeps di = AcidDepDB $ \ r -> do
     liftIO $ query r $ LookupDeps_ di
 
@@ -88,3 +93,12 @@ runAcidDepDB (AcidDepDB m) = do
   liftIO $ createCheckpoint database
   liftIO $ closeAcidState database
   return a
+
+
+dumpStorage :: IO DB
+dumpStorage = do
+  let path = "c:/Users/Victor/Documents/wrk/newsite/anotherAttemptStore/deps/"
+  db <- openLocalStateFrom path $ DB M.empty
+  d <- query db DumpDB
+  closeAcidState db
+  return d
