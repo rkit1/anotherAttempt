@@ -22,5 +22,5 @@ test = do
       case r of
         Right _ -> return Nothing
         Left err -> liftIO $ putStrLn err >> return (Just err))
-    $ S.fromList ["/index.htm", "/remember.htm"]
+    $ S.fromList ["/index.htm"]
   return ()
