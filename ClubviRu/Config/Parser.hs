@@ -3,11 +3,19 @@ module ClubviRu.Config.Parser where
 import qualified Data.Map as M
 import Control.Monad.Trans
 import Text.Peggy
+import SiteGen.IO as IO
+import SiteGen.Deps
+import Control.Monad
+
 
 parseConfigFile :: MonadIO m => FilePath -> m (Either ParseError (M.Map String String))
 parseConfigFile fp = liftIO $ do
   a <- parseFile configParser fp
   return $ fmap linesToMap a
+
+readConfig :: (DepRecordMonad m si di, MonadSiteIO si di m)
+  => si -> m (Either ParseError (M.Map String String))
+readConfig res = parseConfig `liftM` IO.readString res
 
 parseConfig :: String -> Either ParseError (M.Map String String)
 parseConfig str = fmap linesToMap $ parseString configParser "config string" str

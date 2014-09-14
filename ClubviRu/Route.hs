@@ -78,6 +78,7 @@ clubviRoute = msum
   [ exactFile
   , archive
   , mainPage
+  , mainPageListing
   ] `mplus` unhandled
   where
     unhandled = do
@@ -93,6 +94,18 @@ mainPage = do
   recordHtmlLinks str d
   writeString d str
   depFile
+
+
+mainPageListing :: (PathHandlerM m) => m ()
+mainPageListing = do
+  d@Resource{..} <- get
+  let s = Resource{resName = resName `changeExtT` "mpl", .. }
+  doesExistSI s >>= guard
+  str <- runMainPageListing s
+  recordHtmlLinks str d
+  writeString d str
+  depFile
+
 
 archive :: PathHandlerM m => m ()
 archive = do

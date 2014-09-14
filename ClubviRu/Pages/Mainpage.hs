@@ -38,8 +38,8 @@ runMainPage ::
   ( DepRecordMonad m SP DP
   , SiteConfig m, MonadSiteIO SP DP m)
   => Maybe Date -> SP -> m String
-runMainPage pageDate configPath@Resource{..} = do
-  Right cfg <- parseConfig `liftM` IO.readString configPath
+runMainPage pageDate mpFile = do
+  Right cfg <- readConfig mpFile
 
   mid' <- cfg ! "mid"
   let mid = filter (not . all isSpace) $ lines mid'
@@ -50,7 +50,7 @@ runMainPage pageDate configPath@Resource{..} = do
               | otherwise = take 50 mid
       archiveLink m = Resource
         { resPathType = Absolute
-        , resPath = ["archive", getName configPath]
+        , resPath = ["archive", getName mpFile]
         , resName = fromString (showDate m ++ ".htm") }
 
 
@@ -71,16 +71,40 @@ runMainPage pageDate configPath@Resource{..} = do
           | (m,_) <- months ]
         | otherwise = processColumn =<< cfg ! "right"
   
-  str <- runMAndRecordSI $ do
+  runMAndRecordSI $ do
     "title" $=. cfg ! "title"
     "leftcolumn" $=. processColumn =<< cfg ! "left"
     "rightcolumn" $=. right
-    "news" $=. return news
+    "news" $= news
     callRTPL "/~templates/mainpage1.rtpl"
 
-  return str
 
+runMainPageListing ::
+  ( DepRecordMonad m SP DP
+  , MonadSiteIO SP DP m)
+  => SP -> m String
+runMainPageListing mplFile = do
+  Right cfg <- readConfig mplFile
 
+  mid' <- cfg ! "mid"
+  let mid = filter (not . all isSpace) $ lines mid'
+
+  links <- forM mid $ \ x -> do
+    let link = fromString x `relativeTo` mplFile
+    Right pcfg <- readConfig link
+    title <- pcfg ! "title"
+    let linkStr = printf "<p><a href=\"%s\">%s</a></p>"
+                  (toFilePath "" $ link `changeExt` "htm")
+                  title :: String
+    return $ mkDictionary [ ("content", Variable linkStr ) ]
+
+  runMAndRecordSI $ do
+    "title" $=. cfg ! "title"
+    "leftcolumn" $=. processColumn =<< cfg ! "left"
+    "rightcolumn" $=. processColumn =<< cfg ! "right"
+    "news" $= links
+    callRTPL "/~templates/mainpage1.rtpl"
+  
 
 
 runMAndRecordSI :: (MonadIO m, DepRecordMonad m SourcePath di) => M m a -> m a
