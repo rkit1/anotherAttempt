@@ -103,3 +103,12 @@ dumpStorage = do
   closeAcidState db
   writeFile "c:/Users/Victor/Documents/wrk/newsite/anotherAttemptStore/dump"
     $ show d
+
+returnStorage :: IO (DepDBType SP DP UTCTime)
+returnStorage = do
+  let path = "c:/Users/Victor/Documents/wrk/newsite/anotherAttemptStore/deps/"
+  db <- openLocalStateFrom path $ DB M.empty
+  DB d <- query db DumpDB
+  closeAcidState db
+  return d
+  

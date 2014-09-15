@@ -9,7 +9,8 @@ filterLinks :: SiteConfig m => [String] -> m [String]
 filterLinks links = do
   dmns <- myDomains
   let
-    f (Right HTTP{..}) | Just _ <- find (== host) ("":dmns) = [path]
+    f (Right HTTP{..}) | Just _ <- find (== host) (dmns) = ['/':path]
+                       | host == "" = [path]
     f _ = []
     parse str = parseString uriP str str
   return $ links >>= f . parse
