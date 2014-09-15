@@ -95,10 +95,11 @@ runAcidDepDB (AcidDepDB m) = do
   return a
 
 
-dumpStorage :: IO DB
+dumpStorage :: IO ()
 dumpStorage = do
   let path = "c:/Users/Victor/Documents/wrk/newsite/anotherAttemptStore/deps/"
   db <- openLocalStateFrom path $ DB M.empty
   d <- query db DumpDB
   closeAcidState db
-  return d
+  writeFile "c:/Users/Victor/Documents/wrk/newsite/anotherAttemptStore/dump"
+    $ show d

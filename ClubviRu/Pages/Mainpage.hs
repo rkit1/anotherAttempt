@@ -50,7 +50,7 @@ runMainPage pageDate mpFile = do
               | otherwise = take 50 mid
       archiveLink m = Resource
         { resPathType = Absolute
-        , resPath = ["archive", getName mpFile]
+        , resPath = "archive" : resPath mpFile ++ [getName mpFile]
         , resName = fromString (showDate m ++ ".htm") }
 
 
