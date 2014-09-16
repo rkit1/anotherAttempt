@@ -79,11 +79,17 @@ clubviRoute = msum
   , archive
   , mainPage
   , mainPageListing
+  , apps
   ] `mplus` unhandled
   where
     unhandled = do
       d <- get
       throwError $ printf "unhandled desination: %s" (show d)
+
+apps :: (PathHandlerM m) => m ()
+apps = do
+  Resource{resPath = "apps":_} <- get
+  return ()
 
 mainPage :: (PathHandlerM m) => m ()
 mainPage = do
