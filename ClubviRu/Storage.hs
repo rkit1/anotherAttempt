@@ -16,6 +16,8 @@ import qualified Data.Map as M
 import qualified Data.Set as S
 import Data.Data
 import Control.Applicative
+import Control.Exception.Lifted
+import Control.Monad.Trans.Control
 
 newtype AcidDepDB m a = AcidDepDB { unADD :: AcidState DB -> m a}
 
@@ -95,16 +97,15 @@ instance MonadIO m => DepDBMonad (AcidDepDB m) SP DP UTCTime where
     liftIO $ query r $ LookupDeps_ di
 
 
-runAcidDepDB
-  :: (MonadIO m, SiteConfig m)
-     => AcidDepDB m b -> m b
+runAcidDepDB :: (MonadIO m, SiteConfig m, MonadBaseControl IO m)
+  => AcidDepDB m b -> m b
 runAcidDepDB (AcidDepDB m) = do
   path <- storeRoot
-  database <- liftIO $ openLocalStateFrom (path ++ "/deps/") $ DB M.empty
-  a <- m database
-  liftIO $ createCheckpoint database
-  liftIO $ closeAcidState database
-  return a
+  liftBaseOp
+    (bracket
+      (openLocalStateFrom (path ++ "/deps/") $ DB M.empty)
+      (\ db -> createCheckpoint db >> closeAcidState db))
+    m
 
 
 dumpStorage :: IO ()

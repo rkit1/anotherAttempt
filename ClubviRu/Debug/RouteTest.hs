@@ -14,7 +14,7 @@ import Control.Monad.Trans
 import SiteGen.IO
 import ClubviRu.Storage
 
-test :: MonadIO m => m ()
+test :: IO ()
 test = do
   runClubviRu $ runClubviTime $ runAcidDepDB $ process
     ( runDepRecordAndReport $ \ d -> do

@@ -1,5 +1,5 @@
 {-# LANGUAGE RecordWildCards, GeneralizedNewtypeDeriving, FlexibleInstances, 
-  MultiParamTypeClasses, UndecidableInstances, OverloadedStrings #-}
+  MultiParamTypeClasses, UndecidableInstances, OverloadedStrings, TypeFamilies #-}
 module ClubviRu.Monad where
 import ClubviRu.Config.Site
 import Network.URI
@@ -11,6 +11,9 @@ import ClubviRu.Resource
 import System.IO
 import System.Directory
 import Control.Applicative
+import Control.Monad.Base
+import Control.Monad.Trans.Control
+import Control.Monad
 
 newtype ClubviRuMonad m a = ClubviRuMonad {runClubviRu :: m a} 
   deriving (Monad, MonadIO, Functor, Applicative)
@@ -29,6 +32,20 @@ instance DepDBMonad m si di t => DepDBMonad (ClubviRuMonad m) si di t where
 instance MonadTrans ClubviRuMonad where
   lift = ClubviRuMonad
 
+instance (Functor m, Monad m, MonadBase b m)
+  => MonadBase b (ClubviRuMonad m) where
+  liftBase = liftBaseDefault 
+
+instance MonadBaseControl b m => MonadBaseControl b (ClubviRuMonad m) where
+  newtype StM (ClubviRuMonad m) a =
+    StMClubvi {unStMClubvi :: ComposeSt ClubviRuMonad m a}
+  liftBaseWith = defaultLiftBaseWith StMClubvi
+  restoreM     = defaultRestoreM   unStMClubvi
+
+instance MonadTransControl ClubviRuMonad where
+  newtype StT ClubviRuMonad a = StClubvi {unStClubvi :: a}
+  liftWith f = ClubviRuMonad $ f $ liftM StClubvi . runClubviRu
+  restoreT = ClubviRuMonad . liftM unStClubvi
 
 
 instance (MonadIO m) => 
