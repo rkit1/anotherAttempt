@@ -21,12 +21,13 @@ import Text.Printf
 import Data.String
 import ClubviRu.URIParser
 import SiteGen.LinkExtractor
-
+import Control.Applicative
 
 ----
 newtype PathHandler m a =
   PH { runPH :: ErrorT String (StateT (Resource Destination) m) a }
-    deriving (Monad, MonadPlus, MonadIO, MonadError String)
+    deriving (Functor, Applicative, Alternative, Monad
+             , MonadPlus, MonadIO, MonadError String)
 
 runPathHandler :: Monad m
   => DP -> PathHandler m a -> m (Either String a)

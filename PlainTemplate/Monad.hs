@@ -32,6 +32,7 @@ newtype ME m a = ME { runME :: m (Either E a) }
 
 
 
+
 data E = E (SourcePos,SourcePos) String deriving Show
 
 data StackElem = StackElem
@@ -49,6 +50,16 @@ $(deriveAccessors ''S)
 headA = A.accessor head (\ a (x:xs) -> a:xs ) 
 context = stack >>> headA >>> context_ 
 tag = stack >>> headA >>> tag_
+
+instance Monad m => Functor (ME m) where
+  fmap = liftM
+
+instance Monad m => Applicative (ME m) where
+  pure = return
+  a <*> b = do
+    f <- a
+    arg <- b
+    return $ f arg
 
 instance Monad m => Monad (ME m) where
   return a = ME ( return ( return a ) )
@@ -109,7 +120,7 @@ infixr 0 $=.
 a $=. b = b >>= \ b' -> a $= b'
 
 newtype M m a = M {runM' :: ME (StateT S m) a}
-  deriving (Monad, MonadError String, MonadIO, MonadState S)
+  deriving (Functor, Applicative, Monad, MonadError String, MonadIO, MonadState S)
 
 instance MonadSiteIO si di m => MonadSiteIO si di (M m) where
   openSI = lift . openSI

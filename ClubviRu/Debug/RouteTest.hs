@@ -16,11 +16,12 @@ import ClubviRu.Storage
 
 test :: MonadIO m => m ()
 test = do
-  runClubviRu $ runClubviTime $ runAcidDepDB
-    $ process (runDepRecordAndReport $ \ d -> do
+  runClubviRu $ runClubviTime $ runAcidDepDB $ process
+    ( runDepRecordAndReport $ \ d -> do
       r <- runPathHandler d clubviRoute
       case r of
         Right _ -> return Nothing
         Left err -> liftIO $ putStrLn err >> return (Just err))
     $ S.fromList ["/index.htm"]
   return ()
+

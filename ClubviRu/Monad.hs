@@ -10,9 +10,10 @@ import SiteGen.Deps
 import ClubviRu.Resource
 import System.IO
 import System.Directory
+import Control.Applicative
 
 newtype ClubviRuMonad m a = ClubviRuMonad {runClubviRu :: m a} 
-  deriving (Monad, MonadIO)
+  deriving (Monad, MonadIO, Functor, Applicative)
 
 instance (MonadIO m, DepRecordMonad m si di) => 
   DepRecordMonad (ClubviRuMonad m) si di where

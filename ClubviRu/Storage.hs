@@ -15,6 +15,7 @@ import Data.SafeCopy
 import qualified Data.Map as M
 import qualified Data.Set as S
 import Data.Data
+import Control.Applicative
 
 newtype AcidDepDB m a = AcidDepDB { unADD :: AcidState DB -> m a}
 
@@ -33,6 +34,17 @@ instance MonadSiteIO SP DP m => MonadSiteIO SP DP (AcidDepDB m) where
   openDI = lift . openDI
   doesExistSI = lift . doesExistSI
   
+instance Monad m => Functor (AcidDepDB m) where
+  fmap = liftM
+
+instance Monad m => Applicative (AcidDepDB m) where
+  pure = return
+  a <*> b = do
+    f <- a
+    arg <- b
+    return $ f arg
+
+
 instance Monad m => Monad (AcidDepDB m) where
   return a = AcidDepDB $ const $ return a
   AcidDepDB f >>= g = AcidDepDB $ \ r -> do

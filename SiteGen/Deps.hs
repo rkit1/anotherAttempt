@@ -6,6 +6,7 @@ import qualified Data.Set as S
 import Control.Monad.State.Strict
 import Control.Monad.Reader
 import Control.Monad.Trans
+import Control.Applicative
 import qualified Data.Map.Strict as M
 
 -- di = destination identifier site.com/a/b
@@ -58,7 +59,7 @@ instance (Monad m, Ord si, Ord di) => DepRecordMonad (DepRecord si di m) si di w
   recordDI di = DepRecord $ modify $ \ (ss, dd) -> (ss, S.insert di dd)
 
 newtype DepRecord si di m a = DepRecord (StateT (S.Set si, S.Set di) m a)
-  deriving (Monad, MonadIO, MonadTrans)
+  deriving (Monad, MonadIO, MonadTrans, Applicative, Functor)
 
 runDepRecord :: Monad m
   => DepRecord si di m (Maybe String)
@@ -98,7 +99,7 @@ type DepDBType si di t = (M.Map di (Either String (t, S.Set si, S.Set di)))
 emptyDDBType = M.empty
 
 newtype DepDB si di t m a = DepDB (StateT (DepDBType si di t) m a)
-  deriving (Monad, MonadIO, MonadTrans)
+  deriving (Monad, MonadIO, MonadTrans, Functor, Applicative)
 
 instance DepDBMonad m si di t => DepDBMonad (Time si t m) si di t where
   recordDeps d dt = lift $ recordDeps d dt
@@ -142,7 +143,7 @@ instance (Monad m, Ord si) => TimeMonad (Time si t m) si t where
         return t
 
 newtype Time si t m a = Time (StateT (TimeState si t m) m a)
-  deriving (Monad, MonadIO)
+  deriving (Monad, MonadIO, Functor, Applicative)
 
 runTime :: (Monad m, Ord si) => (si -> m t) -> (m t) -> Time si t m a -> m a
 runTime cht cut (Time m) = 
