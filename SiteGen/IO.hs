@@ -91,6 +91,8 @@ safeCheckTime si = do
 runMemoTime :: (MonadIO m, Ord si) => MemoTime si t m a -> m a
 runMemoTime (MemoTime m) = evalStateT m M.empty
 
+
+-- | True == changed
 checkForChanges:: (MonadSiteIO si di t m, Ord t) => t -> S.Set si -> m Bool
 checkForChanges t ss = do
   go $ S.toList ss
@@ -100,4 +102,4 @@ checkForChanges t ss = do
       st <- safeCheckTime x
       case st of
         Just a | a <= t -> go xs
-        _ -> return False
+        _ -> return True
