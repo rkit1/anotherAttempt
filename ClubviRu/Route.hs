@@ -13,8 +13,7 @@ import Control.Monad.Trans
 import Control.Monad.Cont
 import Control.Monad.State
 import Control.Monad.Error
-import SiteGen.IO
-import SiteGen.Deps
+import SiteGen.Main
 import qualified Data.ByteString.Lazy as LBS
 import qualified Data.Text as T
 import Text.Printf

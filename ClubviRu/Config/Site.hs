@@ -1,7 +1,7 @@
 {-# LANGUAGE StandaloneDeriving, KindSignatures, GeneralizedNewtypeDeriving #-}
 
 module ClubviRu.Config.Site where
-import SiteGen.Deps
+import SiteGen.Main
 import Control.Monad.Trans
 
 class Monad m => SiteConfig m where

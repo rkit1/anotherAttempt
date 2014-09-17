@@ -1,8 +1,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 module ClubviRu.DepFile where
 import ClubviRu.Resource
-import SiteGen.IO
-import SiteGen.Deps
+import SiteGen.Main
 import Data.Char
 import Data.String
 

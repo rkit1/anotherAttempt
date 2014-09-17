@@ -2,10 +2,9 @@
   , DeriveDataTypeable, TypeSynonymInstances, FlexibleInstances
   , MultiParamTypeClasses, FlexibleContexts #-}
 module ClubviRu.Storage where
-import SiteGen.Deps
+import SiteGen.Main
 import ClubviRu.Config.Site
 import ClubviRu.Resource
-import SiteGen.IO
 import Data.Time.Clock
 import Control.Monad.Trans
 import Control.Monad.State

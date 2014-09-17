@@ -15,8 +15,7 @@ import qualified Data.Set as S
 import System.Process
 import System.FilePath
 import qualified Text.Parsec as P
-import SiteGen.IO
-import SiteGen.Deps
+import SiteGen.Main
 import Data.String
 
 callRTPL :: (PTLMonad si di m) => si -> m String

@@ -14,14 +14,13 @@ import XmlTemplate.Head
 import XmlTemplate.WidgetHead
 import Control.Monad.Writer
 import Library
-import SiteGen.Deps
+import SiteGen.Main
 import qualified Data.Accessor.Monad.MTL.State as A
 import qualified Data.Set as S
 import ClubviRu.Listing
 import PlainTemplate.Monad
 import PlainTemplate.Process
 import PlainTemplate.Variable
-import SiteGen.Deps
 import SiteGen.IO as IO
 import ClubviRu.Config.Parser
 import ClubviRu.Config.Site

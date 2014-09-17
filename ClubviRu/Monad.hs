@@ -5,8 +5,7 @@ import ClubviRu.Config.Site
 import Network.URI
 import Data.List
 import Control.Monad.Trans
-import SiteGen.IO
-import SiteGen.Deps
+import SiteGen.Main
 import ClubviRu.Resource
 import System.IO
 import System.Directory

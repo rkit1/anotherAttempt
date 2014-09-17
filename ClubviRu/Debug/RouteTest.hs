@@ -5,13 +5,12 @@ import ClubviRu.Route
 import ClubviRu.Monad
 import ClubviRu.Resource
 import qualified Data.Set as S
-import SiteGen.Deps
+import SiteGen.Main
 import ClubviRu.Time
 import Data.Time.Clock
 import qualified Data.Map as M
 import ClubviRu.Config.Site
 import Control.Monad.Trans
-import SiteGen.IO
 import ClubviRu.Storage
 
 test :: IO ()

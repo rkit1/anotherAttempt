@@ -14,7 +14,7 @@ import SiteGen.IO as IO
 import System.IO
 import Control.Monad.Trans
 import ClubviRu.Resource
-import SiteGen.Deps
+import SiteGen.Main
 import Data.Knob
 import ClubviRu.Debug.Helpers
 

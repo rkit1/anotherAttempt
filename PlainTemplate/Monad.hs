@@ -15,8 +15,7 @@ import Data.Accessor.Monad.MTL.State ((%=),(%:))
 import qualified Data.Accessor.Monad.MTL.State as A
 import Data.Accessor.Template
 import Control.Exception as E
-import SiteGen.IO
-import SiteGen.Deps
+import SiteGen.Main
 import Data.String
 
 class (MonadState S m, MonadIO m, MonadError String m, Show si, Show di

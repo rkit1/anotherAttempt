@@ -4,7 +4,7 @@ import qualified Data.Map as M
 import Control.Monad.Trans
 import Text.Peggy
 import SiteGen.IO as IO
-import SiteGen.Deps
+import SiteGen.Main
 import Control.Monad
 
 

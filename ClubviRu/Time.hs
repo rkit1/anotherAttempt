@@ -1,6 +1,6 @@
 {-# LANGUAGE TemplateHaskell #-}
 module ClubviRu.Time where
-import SiteGen.Deps
+import SiteGen.Main
 import ClubviRu.Resource
 import ClubviRu.Config.Site
 import Control.Monad.Trans

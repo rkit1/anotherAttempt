@@ -13,8 +13,7 @@ import qualified Data.Text as T
 import qualified Data.Map as M
 import qualified Blaze.ByteString.Builder as BZ
 import qualified Data.ByteString as BS
-import SiteGen.IO
-import SiteGen.Deps
+import SiteGen.Main
 import ClubviRu.Debug.Helpers
 import ClubviRu.Resource
 import qualified Data.Map as M

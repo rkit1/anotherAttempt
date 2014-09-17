@@ -2,7 +2,8 @@
 module SiteGen.IO where
 import System.IO
 import Control.Monad.Reader
-import SiteGen.Deps
+import SiteGen.DepRecord
+import SiteGen.Time
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as LBS
 
@@ -20,25 +21,6 @@ instance MonadSiteIO si di m => MonadSiteIO si di (Time si t m) where
   openSI = lift . openSI
   openDI = lift . openDI
   doesExistSI = lift . doesExistSI
-
-
-------
-{-
-newtype SIO si di t a = SIO (ReaderT (SIOData si di t) t a) deriving (Monad, MonadIO)
-instance MonadTrans (SIO si di) where
-  lift m = SIO $ lift m
-
-data SIOData si di m = SIOData
-  { _openSI :: si -> m Handle
-  , _openDI :: di -> m Handle } 
-
-instance (MonadIO t) => MonadSiteIO si di (SIO si di t) where
-  openSI si = SIO $ ask >>= \ SIOData{..} -> lift $ _openSI si
-  openDI di = SIO $ ask >>= \ SIOData{..} -> lift $ _openDI di
-
-runSIO :: (si -> m Handle) -> (di -> m Handle) -> SIO si di m a -> m a
-runSIO _openSI _openDI (SIO m) = runReaderT m $ SIOData{..}
--}
 
 readString :: (DepRecordMonad m si di, MonadSiteIO si di m) 
   => si -> m String

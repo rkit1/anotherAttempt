@@ -1,5 +1,3 @@
-people
 dependencies and package splitting
 executables
 handle removed sources
-gracefully close acid-state
