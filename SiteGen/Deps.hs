@@ -135,31 +135,31 @@ instance TimeMonad m si t => TimeMonad (DepDB si di t m) si t where
   curTime = lift curTime
 
 instance (Ord si, MonadIO m) => TimeMonad (Time si t m) si t where
-  curTime = Time $ gets curTime_ >>= liftIO
+  curTime = Time $ gets curTime_ >>= lift
   checkTime si = Time $ do
     x <- get 
     case M.lookup si (memoMap x) of
       Just t -> return t
       Nothing -> do
-        t <- liftIO $ checkTime_ x si
+        t <- lift $ checkTime_ x si
         put x{memoMap = M.insert si t $ memoMap x}
         return t
 
-newtype Time si t m a = Time (StateT (TimeState si t) m a)
+newtype Time si t m a = Time (StateT (TimeState si t m) m a)
   deriving (Monad, MonadIO, Functor, Applicative)
 
 instance MonadTransControl (Time si t) where
-  data StT (Time si t) a = StTime (a, TimeState si t)
+  data StT (Time si t) a = forall m. StTime (a, TimeState si t m)
   liftWith f = Time $ StateT $ \s -> do
     x <- f $ \ (Time t) -> do
-      state <- runStateT t s
+      state <- runStateT t $ unsafeCoerce s
       return $ StTime state
-    return (x, s)
+    return (x,  s)
 
   restoreT m = do
     Time $ StateT $ \ _ -> do
-      StTime (a, st) <- m
-      return (a, st)
+      StTime a <- m
+      return $ unsafeCoerce a
 
 instance MonadBaseControl b m => MonadBaseControl b (Time si t m) where
   newtype StM (Time si t m) a = StMT {unStMT :: ComposeSt (Time si t) m a}
@@ -171,7 +171,7 @@ instance (Functor m, Monad m, MonadBase b m)
   => MonadBase b (Time si t m) where
   liftBase = liftBaseDefault 
 
-runTime :: (MonadIO m, Ord si) => (si -> IO t) -> (IO t) -> Time si t m a -> m a
+runTime :: (MonadIO m, Ord si) => (si -> m t) -> (m t) -> Time si t m a -> m a
 runTime cht cut (Time m) = 
   evalStateT m TimeState
     { memoMap = M.empty
@@ -192,8 +192,8 @@ checkForChanges t ss = do
 instance MonadTrans (Time si t) where
   lift m = Time $ lift m
 
-data TimeState si t = TimeState
+data TimeState si t m = TimeState
   { memoMap :: !(M.Map si t)
-  , checkTime_ :: si -> IO t
-  , curTime_ :: IO t }
+  , checkTime_ :: si -> m t
+  , curTime_ :: m t }
   
