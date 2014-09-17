@@ -9,7 +9,7 @@ import Data.String
 -- | Вывод релативен!!!
 readDepFile :: 
   ( DepRecordMonad m SP di
-  , MonadSiteIO SP di m) 
+  , MonadSiteIO SP di t m) 
   => SP -> m [DP]
 readDepFile si = do
   ls <- readString si

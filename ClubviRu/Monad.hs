@@ -13,6 +13,7 @@ import Control.Applicative
 import Control.Monad.Base
 import Control.Monad.Trans.Control
 import Control.Monad
+import Data.Time
 
 newtype ClubviRuMonad m a = ClubviRuMonad {runClubviRu :: m a} 
   deriving (Monad, MonadIO, Functor, Applicative)
@@ -48,7 +49,7 @@ instance MonadTransControl ClubviRuMonad where
 
 
 instance (MonadIO m) => 
-  MonadSiteIO SourcePath DestinationPath (ClubviRuMonad m) where
+  MonadSiteIO SourcePath DestinationPath UTCTime (ClubviRuMonad m) where
     openDI di@Resource{..} = do
       fp <- toFilePathM di
       dp <- toDirectoryPathM di
@@ -62,7 +63,8 @@ instance (MonadIO m) =>
                   hSetEncoding h utf8
                   return h
     doesExistSI si = toFilePathM si >>= \ fp -> liftIO $ doesFileExist fp
-
+    checkTime si = toFilePathM si >>= \ fp -> liftIO $ getModificationTime fp
+    curTime = liftIO $ getCurrentTime 
 
 instance Monad m => SiteConfig (ClubviRuMonad m) where
   sourceRoot = 

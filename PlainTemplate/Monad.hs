@@ -19,12 +19,12 @@ import SiteGen.Main
 import Data.String
 
 class (MonadState S m, MonadIO m, MonadError String m, Show si, Show di
-      , MonadSiteIO si di m, DepRecordMonad m si di, IsString si, IsString di)
-      => PTLMonad si di m
+      , MonadSiteIO si di t m, DepRecordMonad m si di, IsString si, IsString di)
+      => PTLMonad si di t m
       
 instance (MonadState S m, MonadIO m, MonadError String m, Show si, Show di
-         , MonadSiteIO si di m, DepRecordMonad m si di, IsString si, IsString di)
-         => PTLMonad si di m
+         , MonadSiteIO si di t m, DepRecordMonad m si di, IsString si, IsString di)
+         => PTLMonad si di t m
 
 newtype ME m a = ME { runME :: m (Either E a) }
 
@@ -92,39 +92,41 @@ instance (Error a, MonadError a (ME m), MonadIO m) => MonadIO (ME m) where
       Left e -> throwError $ strMsg $ show (e :: SomeException)
       Right z -> return z
 
-lookupVar :: PTLMonad si di m => String -> m Variable
+lookupVar :: PTLMonad si di t m => String -> m Variable
 lookupVar str = do
   Dictionary x <- A.get context
   case M.lookup str x of
     Just a -> return a
     Nothing -> throwError $ strMsg $ "Variable not found: " ++ str
 
-setVar :: PTLMonad si di m => String -> Variable -> m ()
+setVar :: PTLMonad si di t m => String -> Variable -> m ()
 setVar nm var = context %: \ (Dictionary a) -> Dictionary $ M.insert nm var a
 
-updateVars :: PTLMonad si di m => Dictionary -> m ()
+updateVars :: PTLMonad si di t m => Dictionary -> m ()
 updateVars (Dictionary a) = context %: \ (Dictionary b) -> Dictionary $ M.union a b
 
-recordDepend :: PTLMonad si di m => FilePath -> m ()
+recordDepend :: PTLMonad si di t m => FilePath -> m ()
 recordDepend d = depends %: S.insert d
 
 infixr 0 $=
-($=) :: (Typeable a, PTLMonad si di m) => String -> a -> m ()
+($=) :: (Typeable a, PTLMonad si di t m) => String -> a -> m ()
 ($=) n v = setVar n (Variable v)
 
 
 infixr 0 $=.
-($=.) :: (Typeable a, PTLMonad si di  m)
+($=.) :: (Typeable a, PTLMonad si di t m)
   => String -> m a -> m ()
 a $=. b = b >>= \ b' -> a $= b'
 
 newtype M m a = M {runM' :: ME (StateT S m) a}
   deriving (Functor, Applicative, Monad, MonadError String, MonadIO, MonadState S)
 
-instance MonadSiteIO si di m => MonadSiteIO si di (M m) where
+instance MonadSiteIO si di t m => MonadSiteIO si di t (M m) where
   openSI = lift . openSI
   openDI = lift . openDI
   doesExistSI = lift . doesExistSI
+  checkTime = lift . checkTime
+  curTime = lift curTime
   
 instance DepRecordMonad m si di => DepRecordMonad (M m) si di where
   recordSI = lift . recordSI

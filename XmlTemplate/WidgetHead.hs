@@ -21,7 +21,7 @@ import Data.Knob
 
 readWidgetHead
   :: (DepRecordMonad m SP DP,
-      MonadSiteIO SP DP m) =>
+      MonadSiteIO SP DP t m) =>
      SP -> m String
 readWidgetHead path@Resource{..} = do
   s <- readByteString path

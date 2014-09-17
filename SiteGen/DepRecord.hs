@@ -7,7 +7,6 @@ import qualified Data.Map as M
 import SiteGen.DepDB
 import Control.Monad.State.Strict
 import Control.Applicative
-import SiteGen.Time
 
 class Monad m => DepRecordMonad m si di | m -> si di where
   recordSI :: si -> m ()
@@ -28,24 +27,3 @@ runDepRecord (DepRecord m) = do
   case a of
     Nothing ->  return $ Right (sets)
     Just err -> return $ Left err
-
-runDepRecordAndReport
-  :: (Ord t, TimeMonad m si t, DepDBMonad m si di t) =>
-     (di -> DepRecord si di m (Maybe String)) -> di -> m (S.Set di)
-runDepRecordAndReport f di = do
-  deps <- lookupDeps di
-  let doit = do
-        res <- runDepRecord (f di)
-        t <- curTime 
-        case res of
-          Left err -> do
-            recordDeps di $ Left err
-            return S.empty
-          Right (ss, dd) -> do
-            recordDeps di $ Right (t, ss, dd)
-            return dd
-  case deps of
-    Just (Right (t, ss, dd)) -> do
-      c <- checkForChanges t ss
-      if c then doit else return dd
-    _ -> doit

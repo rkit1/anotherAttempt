@@ -15,9 +15,3 @@ instance (SiteConfig m) => SiteConfig (DepRecord si di m)  where
   destinationRoot = lift destinationRoot
   storeRoot = lift storeRoot
   myDomains = lift myDomains
-
-instance (SiteConfig m) => SiteConfig (Time si t m) where
-  sourceRoot = lift sourceRoot
-  destinationRoot = lift destinationRoot
-  storeRoot = lift storeRoot
-  myDomains = lift myDomains

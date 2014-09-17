@@ -6,7 +6,6 @@ import ClubviRu.Monad
 import ClubviRu.Resource
 import qualified Data.Set as S
 import SiteGen.Main
-import ClubviRu.Time
 import Data.Time.Clock
 import qualified Data.Map as M
 import ClubviRu.Config.Site
@@ -15,7 +14,7 @@ import ClubviRu.Storage
 
 test :: IO ()
 test = do
-  runClubviRu $ runClubviTime $ runAcidDepDB $ process
+  runClubviRu $ runAcidDepDB $ process
     ( runDepRecordAndReport $ \ d -> do
       r <- runPathHandler d clubviRoute
       case r of

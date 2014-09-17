@@ -35,7 +35,7 @@ a ! b = case M.lookup b a of Nothing -> $terror ("key not found: " ++ b)
 
 runMainPage ::
   ( DepRecordMonad m SP DP
-  , SiteConfig m, MonadSiteIO SP DP m)
+  , SiteConfig m, MonadSiteIO SP DP t m)
   => Maybe Date -> SP -> m String
 runMainPage pageDate mpFile = do
   Right cfg <- readConfig mpFile
@@ -80,7 +80,7 @@ runMainPage pageDate mpFile = do
 
 runMainPageListing ::
   ( DepRecordMonad m SP DP
-  , MonadSiteIO SP DP m)
+  , MonadSiteIO SP DP t m)
   => SP -> m String
 runMainPageListing mplFile = do
   Right cfg <- readConfig mplFile
@@ -119,7 +119,7 @@ runMAndRecordSI m = do
     Left err -> $terror (show err)
 
 
-processColumn :: PTLMonad SP DP m => String -> m String
+processColumn :: PTLMonad SP DP t m => String -> m String
 processColumn str = 
   let list = filter (not . all isSpace) $ lines str
   in liftM concat $ forM list $ \ item -> 

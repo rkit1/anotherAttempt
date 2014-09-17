@@ -13,7 +13,7 @@ parseConfigFile fp = liftIO $ do
   a <- parseFile configParser fp
   return $ fmap linesToMap a
 
-readConfig :: (DepRecordMonad m si di, MonadSiteIO si di m)
+readConfig :: (DepRecordMonad m si di, MonadSiteIO si di t m)
   => si -> m (Either ParseError (M.Map String String))
 readConfig res = parseConfig `liftM` IO.readString res
 

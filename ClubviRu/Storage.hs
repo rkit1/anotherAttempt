@@ -26,14 +26,13 @@ instance SiteConfig m => SiteConfig (AcidDepDB m) where
   storeRoot = lift storeRoot
   myDomains = lift myDomains 
 
-instance TimeMonad m SP UTCTime => TimeMonad (AcidDepDB m) SP UTCTime where
-  checkTime = lift . checkTime
-  curTime = lift curTime
-
-instance MonadSiteIO SP DP m => MonadSiteIO SP DP (AcidDepDB m) where
+instance MonadSiteIO SP DP UTCTime m
+  => MonadSiteIO SP DP UTCTime (AcidDepDB m) where
   openSI = lift . openSI
   openDI = lift . openDI
   doesExistSI = lift . doesExistSI
+  checkTime = lift . checkTime
+  curTime = lift curTime
   
 instance Monad m => Functor (AcidDepDB m) where
   fmap = liftM

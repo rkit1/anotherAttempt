@@ -21,6 +21,7 @@ import Data.String
 import ClubviRu.URIParser
 import SiteGen.LinkExtractor
 import Control.Applicative
+import Data.Time
 
 ----
 newtype PathHandler m a =
@@ -41,10 +42,12 @@ instance Monad m => MonadState DP (PathHandler m) where
 instance MonadTrans PathHandler where
   lift m = PH $ lift $ lift m
 
-instance MonadSiteIO si di m => MonadSiteIO si di (PathHandler m) where
+instance MonadSiteIO si di t m => MonadSiteIO si di t (PathHandler m) where
   openSI = lift . openSI
   openDI = lift . openDI
   doesExistSI = lift . doesExistSI
+  checkTime = lift . checkTime
+  curTime = lift curTime
 
 instance SiteConfig m => SiteConfig (PathHandler m) where
   sourceRoot = lift sourceRoot
@@ -59,7 +62,7 @@ instance DepRecordMonad m SP DP => DepRecordMonad (PathHandler m) SP DP where
 class
   ( DepRecordMonad m SP DP
   , SiteConfig m
-  , MonadSiteIO SP DP m
+  , MonadSiteIO SP DP UTCTime m
   , MonadPlus m
   , MonadState DP m
   , MonadError String m)
@@ -68,7 +71,7 @@ class
 instance
   ( DepRecordMonad m SP DP
   , SiteConfig m
-  , MonadSiteIO SP DP m )
+  , MonadSiteIO SP DP UTCTime m )
   => PathHandlerM (PathHandler m)
 
 
