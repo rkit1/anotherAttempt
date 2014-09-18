@@ -14,7 +14,6 @@ import qualified Data.Map as M
 import qualified Blaze.ByteString.Builder as BZ
 import qualified Data.ByteString as BS
 import SiteGen.Main
-import ClubviRu.Debug.Helpers
 import ClubviRu.Resource
 import qualified Data.Map as M
 import Data.Knob

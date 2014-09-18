@@ -4,7 +4,7 @@
 module ClubviRu.Route where
 import ClubviRu.Config.Site
 import ClubviRu.Resource
-import ClubviRu.Debug.Helpers
+import Library
 import ClubviRu.Pages.Mainpage
 import ClubviRu.DepFile
 import ClubviRu.Listing

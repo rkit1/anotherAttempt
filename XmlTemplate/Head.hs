@@ -16,7 +16,7 @@ import Control.Monad.Trans
 import ClubviRu.Resource
 import SiteGen.Main
 import Data.Knob
-import ClubviRu.Debug.Helpers
+import Library
 
 readHead :: (DepRecordMonad m SP di, MonadSiteIO SP di t m) => SP -> m String
 readHead src = do
