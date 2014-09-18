@@ -22,6 +22,8 @@ import ClubviRu.URIParser
 import SiteGen.LinkExtractor
 import Control.Applicative
 import Data.Time
+import Control.Exception.Lifted
+import Control.Monad.Trans.Control 
 
 ----
 newtype PathHandler m a =
@@ -29,10 +31,14 @@ newtype PathHandler m a =
     deriving (Functor, Applicative, Alternative, Monad
              , MonadPlus, MonadIO, MonadError String)
 
-runPathHandler :: Monad m
+runPathHandler
+  :: forall m a. MonadBaseControl IO m
   => DP -> PathHandler m a -> m (Either String a)
-runPathHandler input (PH a) = do
-  evalStateT (runErrorT a) input
+runPathHandler input (PH a) = catch work handler
+  where
+    work = evalStateT (runErrorT a) input
+    handler :: SomeException -> m (Either String a)
+    handler e = return $ Left $ "runPathHandler: " ++ show input ++ ": " ++ show e
 
 
 instance Monad m => MonadState DP (PathHandler m) where

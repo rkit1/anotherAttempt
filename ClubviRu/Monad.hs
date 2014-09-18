@@ -14,6 +14,7 @@ import Control.Monad.Base
 import Control.Monad.Trans.Control
 import Control.Monad
 import Data.Time
+import Control.Monad.Trans.Control
 
 newtype ClubviRuMonad m a = ClubviRuMonad {runClubviRu :: m a} 
   deriving (Monad, MonadIO, Functor, Applicative)

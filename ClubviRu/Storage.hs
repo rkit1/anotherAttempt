@@ -1,6 +1,6 @@
 {-# LANGUAGE TemplateHaskell, GeneralizedNewtypeDeriving, TypeFamilies
   , DeriveDataTypeable, TypeSynonymInstances, FlexibleInstances
-  , MultiParamTypeClasses, FlexibleContexts #-}
+  , MultiParamTypeClasses, FlexibleContexts, UndecidableInstances #-}
 module ClubviRu.Storage where
 import SiteGen.Main
 import ClubviRu.Config.Site
@@ -17,8 +17,24 @@ import Data.Data
 import Control.Applicative
 import Control.Exception.Lifted
 import Control.Monad.Trans.Control
+import Control.Monad.Base
 
-newtype AcidDepDB m a = AcidDepDB { unADD :: AcidState DB -> m a}
+newtype AcidDepDB m a = AcidDepDB { unAcidDepDB :: ReaderT (AcidState DB) m a}
+  deriving (Monad, MonadTrans, MonadIO)
+
+instance MonadBaseControl b m => MonadBaseControl b (AcidDepDB m) where
+  newtype StM (AcidDepDB m) a
+    = StMAcidDepDB {unStMAcidDepDB :: ComposeSt AcidDepDB m a}
+  liftBaseWith = defaultLiftBaseWith StMAcidDepDB
+  restoreM     = defaultRestoreM   unStMAcidDepDB
+
+instance MonadBase b m => MonadBase b (AcidDepDB m) where
+  liftBase = liftBaseDefault
+
+instance MonadTransControl AcidDepDB where
+     newtype StT AcidDepDB a = StAcidDepDB {unStAcidDepDB :: StT (ReaderT (AcidState DB)) a}
+     liftWith = defaultLiftWith AcidDepDB unAcidDepDB StAcidDepDB
+     restoreT = defaultRestoreT AcidDepDB unStAcidDepDB
 
 instance SiteConfig m => SiteConfig (AcidDepDB m) where
   sourceRoot = lift sourceRoot
@@ -43,22 +59,6 @@ instance Monad m => Applicative (AcidDepDB m) where
     f <- a
     arg <- b
     return $ f arg
-
-
-instance Monad m => Monad (AcidDepDB m) where
-  return a = AcidDepDB $ const $ return a
-  AcidDepDB f >>= g = AcidDepDB $ \ r -> do
-    x <- f r
-    unADD (g x) r
-  AcidDepDB f >> g = AcidDepDB $ \ r -> do
-    f r
-    unADD g r
-
-instance MonadTrans AcidDepDB where
-  lift m = AcidDepDB $ const $ m
-
-instance MonadIO m => MonadIO (AcidDepDB m) where
-  liftIO m = lift $ liftIO m
 
 recordDeps_ :: DP -> Either String (UTCTime, S.Set SP, S.Set DP) -> Update DB ()
 recordDeps_ di dt = do
@@ -89,15 +89,17 @@ $(deriveSafeCopy 0 'base ''DB)
 $(makeAcidic ''DB ['recordDeps_, 'lookupDeps_, 'dumpDB])
 
 instance MonadIO m => DepDBMonad (AcidDepDB m) SP DP UTCTime where
-  recordDeps di dt = AcidDepDB $ \ r -> do
+  recordDeps di dt = AcidDepDB $ do
+    r <- ask
     liftIO $ update r $ RecordDeps_ di dt
-  lookupDeps di = AcidDepDB $ \ r -> do
+  lookupDeps di = AcidDepDB $ do
+    r <- ask
     liftIO $ query r $ LookupDeps_ di
 
 
 runAcidDepDB :: (MonadIO m, SiteConfig m, MonadBaseControl IO m)
   => AcidDepDB m b -> m b
-runAcidDepDB (AcidDepDB m) = do
+runAcidDepDB (AcidDepDB (ReaderT m)) = do
   path <- storeRoot
   liftBaseOp
     (bracket
