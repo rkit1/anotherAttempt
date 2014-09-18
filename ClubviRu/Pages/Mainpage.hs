@@ -9,8 +9,8 @@ import Data.String
 import qualified Data.Map as M
 import Data.Char
 import Control.Monad
-import XmlTemplate.Head
-import XmlTemplate.WidgetHead
+import ClubviRu.Pages.Mainpage.Head
+import ClubviRu.Pages.Mainpage.WidgetHead
 import Control.Monad.Writer
 import Library
 import SiteGen.Main

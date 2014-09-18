@@ -1,7 +1,7 @@
 {-# LANGUAGE OverloadedStrings, RecordWildCards, TupleSections, NoMonomorphismRestriction, QuasiQuotes, OverloadedStrings
   #-}
-module XmlTemplate.Imgs where
-import XmlTemplate.Monad
+module ClubviRu.Pages.Mainpage.Imgs where
+import XmlTemplate
 import Data.Attoparsec.Text as P
 import qualified Data.Text as T
 import Text.XmlHtml

@@ -43,8 +43,8 @@ instance IsString (Resource a) where
       chunks = T.splitOn "/" $ T.pack str
       resPathType | '/':xs <- str = Absolute
                   | otherwise = Relative
-      resName | last chunks == "" 
-              || last chunks == "." = "index.htm"
+      resName | last chunks == "" || last chunks == "."
+                = "index.htm"
               | otherwise = last chunks
       resPath = removeBeginningUps resPathType $ 
                   removeUps $ removeEmptySegments $ init chunks
@@ -143,20 +143,3 @@ addExt s@Resource{..} ext = s{resName = resName `addExtT` ext}
 
 addExtT :: T.Text -> T.Text -> T.Text
 addExtT name ext = T.intercalate "." [name,ext]
-
-
-{-
-
-test = mapM_ print x
-  where 
-    x :: [Resource a]
-    x = map fromString 
-        [ "./asd/ph.htm"
-        , "ph.htm"
-        , "/pg.htm"
-        , "../asd/dsa"
-        , "/../p"]
-
-
--}
-

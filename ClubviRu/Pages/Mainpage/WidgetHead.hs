@@ -1,10 +1,10 @@
 {-# LANGUAGE RecordWildCards, QuasiQuotes, OverloadedStrings, TemplateHaskell
   , FlexibleContexts #-}
-module XmlTemplate.WidgetHead where
+module ClubviRu.Pages.Mainpage.WidgetHead where
 
 --import MainMonad
-import XmlTemplate.Monad
-import XmlTemplate.WidgetHeadImg
+import XmlTemplate
+import ClubviRu.Pages.Mainpage.WidgetHeadImg
 import qualified Data.ByteString as BS
 import Text.XmlHtml
 import Library
