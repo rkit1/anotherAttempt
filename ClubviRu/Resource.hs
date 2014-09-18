@@ -1,4 +1,5 @@
-{-# LANGUAGE OverloadedStrings, RecordWildCards, DeriveDataTypeable #-}
+{-# LANGUAGE OverloadedStrings, RecordWildCards, DeriveDataTypeable
+  , EmptyDataDecls #-}
 module ClubviRu.Resource where
 import qualified Data.Text as T
 import Data.String

@@ -1,5 +1,5 @@
 {-# LANGUAGE OverloadedStrings, NoMonomorphismRestriction, FlexibleContexts, FlexibleInstances, MultiParamTypeClasses, UndecidableInstances #-}
-module ClubviRu.Debug.RouteTest where
+module Main where
 import Library
 import ClubviRu.Route
 import ClubviRu.Monad
@@ -12,8 +12,8 @@ import ClubviRu.Config.Site
 import Control.Monad.Trans
 import ClubviRu.Storage
 
-test :: IO ()
-test = do
+main :: IO ()
+main = do
   runClubviRu $ runAcidDepDB $ process
     ( runDepRecordAndReport $ \ d -> do
       r <- runPathHandler d clubviRoute
