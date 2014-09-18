@@ -1,5 +1,5 @@
 {-# LANGUAGE OverloadedStrings, NoMonomorphismRestriction, FlexibleContexts, FlexibleInstances, MultiParamTypeClasses, UndecidableInstances #-}
-module ClubviRu.Debog.RouteTest where
+module ClubviRu.Debug.RouteTest where
 import ClubviRu.Debug.Helpers
 import ClubviRu.Route
 import ClubviRu.Monad
