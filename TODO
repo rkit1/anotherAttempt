@@ -1,2 +1,4 @@
 dependencies and package splitting
 catch exceptions in heads
+add copySItoDI
+decode urls

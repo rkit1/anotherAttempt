@@ -38,7 +38,7 @@ runPathHandler input (PH a) = catch work handler
   where
     work = evalStateT (runErrorT a) input
     handler :: SomeException -> m (Either String a)
-    handler e = return $ Left $ "runPathHandler: " ++ show input ++ ": " ++ show e
+    handler e = return $ Left $ "runPathHandler: " ++ toFilePath "" input ++ ": " ++ show e
 
 
 instance Monad m => MonadState DP (PathHandler m) where
@@ -93,7 +93,7 @@ clubviRoute = msum
   where
     unhandled = do
       d <- get
-      throwError $ printf "unhandled desination: %s" (show d)
+      throwError $ printf "unhandled desination: %s" (toFilePath "" d)
 
 apps :: (PathHandlerM m) => m ()
 apps = do

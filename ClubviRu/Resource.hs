@@ -32,10 +32,10 @@ data Resource a = Resource
   { resPathType :: ResPathType
   , resPath :: [T.Text]
   , resName :: T.Text
-  } deriving (Show, Eq, Ord, Typeable, Data)
+  } deriving (Show, Eq, Ord, Typeable, Data, Read)
 
 data ResPathType = Relative | Absolute 
-  deriving (Show, Eq, Ord, Typeable, Data)
+  deriving (Show, Eq, Ord, Typeable, Data, Read)
 
 instance IsString (Resource a) where
   fromString str = Resource{..}
