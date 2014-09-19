@@ -1,16 +1,16 @@
 {-# LANGUAGE RecordWildCards, TemplateHaskell #-}
-module ClubviRu.Listing where
+module ClubviRu.Date where
 import Text.Parsec
 import Library
 import System.Time
 import qualified Data.Map as M
 import Data.Binary
 
-data Date 
-  = Date
+data Date
+  = NullDate
+  | Date
     { dYear :: Int 
     , dMonth :: Month }
-  | NullDate
     deriving (Eq, Ord, Show)
 
 instance Binary Date where

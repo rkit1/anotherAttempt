@@ -16,7 +16,7 @@ import Library
 import SiteGen.Main
 import qualified Data.Accessor.Monad.MTL.State as A
 import qualified Data.Set as S
-import ClubviRu.Listing
+import ClubviRu.Date
 import PlainTemplate.Monad
 import PlainTemplate.Process
 import PlainTemplate.Variable
@@ -64,10 +64,14 @@ runMainPage pageDate mpFile = do
       archiveMainLink = archiveLinkString (archiveLink (fst $ head months)) "Архив"
 
   let right
-        | Just d <- pageDate = return $ concat
-          [ archiveLinkString (archiveLink m) (showDate m)
-          | (m,_) <- months ]
-        | otherwise = processColumn =<< cfg ! "right"
+        | Nothing <- pageDate = processColumn =<< cfg ! "right"
+        | Just d <- pageDate = do
+            "head" $= ("Архив" :: String)
+            "body" $= concat
+              [ archiveLinkString (archiveLink m) (showDate m)
+              | (m,_) <- months ]
+            callRTPL "/~templates/widget.rtpl"
+
   
   runMAndRecordSI $ do
     "title" $=. cfg ! "title"
