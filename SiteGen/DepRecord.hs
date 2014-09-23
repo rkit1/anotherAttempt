@@ -46,3 +46,17 @@ runDepRecord (DepRecord m) = do
   case a of
     Nothing ->  return $ Right (sets)
     Just err -> return $ Left err
+
+
+newtype Peek si di m a = Peek { peek_ :: m a }
+  deriving (Monad, MonadIO, Applicative, Functor)
+
+peek :: DepRecordMonad m si di => Peek si di m a -> m a
+peek = peek_
+
+instance MonadTrans (Peek si di) where
+  lift = Peek
+
+instance DepRecordMonad m si di => DepRecordMonad (Peek si di m) si di where
+  recordSI _ = return ()
+  recordDI _ = return ()

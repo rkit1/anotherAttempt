@@ -39,14 +39,12 @@ runMainPage ::
 runMainPage pageDate mpFile = do
   Right cfg <- readConfig mpFile
 
-  mid' <- cfg ! "mid"
-  let mid = filter (not . all isSpace) $ lines mid'
-      months = groupByMonths mid
-      myChunk | Just d <- pageDate = case lookup d months of
-                Nothing -> $terror "runMainPage: imposible: date not found"
-                Just a -> a
-              | otherwise = take 50 mid
-      archiveLink m = Resource
+  mid <- cfg ! "mid"
+  months <- peekMonths mpFile mid
+  myChunk <- case pageDate of
+    Nothing -> queryLines mpFile mid 50
+    Just d -> queryMonth mpFile mid d
+  let archiveLink m = Resource
         { resPathType = Absolute
         , resPath = "archive" : resPath mpFile ++ [getName mpFile]
         , resName = fromString (showDate m ++ ".htm") }
@@ -57,11 +55,11 @@ runMainPage pageDate mpFile = do
         (toFilePath "" l) n 
 
   news' <- forM myChunk $ \ x -> do
-    x' <- readHeadU $ fromString x 
+    x' <- readHeadU x 
     return $ mkDictionary [ ("content", Variable x' ) ]  
   let news = news' ++ [ mkDictionary [ ("content", Variable archiveMainLink ) ]
                       | pageDate == Nothing ]
-      archiveMainLink = archiveLinkString (archiveLink (fst $ head months)) "Архив"
+      archiveMainLink = archiveLinkString (archiveLink $ head months) "Архив"
 
   let right
         | Nothing <- pageDate = processColumn =<< cfg ! "right"
@@ -69,7 +67,7 @@ runMainPage pageDate mpFile = do
             "head" $= ("Архив" :: String)
             "body" $= concat
               [ archiveLinkString (archiveLink m) (showDate m)
-              | (m,_) <- months ]
+              | m <- months ]
             callRTPL "/~templates/widget.rtpl"
 
   

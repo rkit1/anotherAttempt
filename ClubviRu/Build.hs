@@ -11,6 +11,7 @@ import qualified Data.Map as M
 import ClubviRu.Config.Site
 import Control.Monad.Trans
 import ClubviRu.Storage
+import System.IO
 
 main :: IO ()
 main = do
@@ -21,5 +22,4 @@ main = do
         Right _ -> return Nothing
         Left err -> liftIO $ putStrLn err >> return (Just err))
     $ S.fromList ["/index.htm"]
-  return ()
 

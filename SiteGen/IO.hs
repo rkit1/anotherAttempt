@@ -26,6 +26,12 @@ instance MonadSiteIO si di t m => MonadSiteIO si di t (DepRecord si di m) where
   checkTime = lift . checkTime
   curTime = lift curTime
 
+instance MonadSiteIO si di t m => MonadSiteIO si di t (Peek si di m) where
+  openSI = lift . openSI
+  openDI = lift . openDI
+  doesExistSI = lift . doesExistSI
+  checkTime = lift . checkTime
+  curTime = lift curTime
 
 readString :: (DepRecordMonad m si di, MonadSiteIO si di t m) 
   => si -> m String
