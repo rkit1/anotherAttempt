@@ -52,6 +52,7 @@ instance MonadSiteIO si di t m => MonadSiteIO si di t (PathHandler m) where
   openSI = lift . openSI
   openDI = lift . openDI
   doesExistSI = lift . doesExistSI
+  copySItoDI si di = lift $ copySItoDI si di
   checkTime = lift . checkTime
   curTime = lift curTime
 
@@ -139,7 +140,7 @@ exactFile = do
   doesExistSI s >>= guard
   msum
     [ copyHtmlAndRecord s d
-    , copyAnything s d ]
+    , copySItoDI s d ]
   depFile
   
 depFile :: (PathHandlerM m) => m ()
@@ -156,7 +157,6 @@ depFile = do
 
 
 
-----
 copyHtmlAndRecord :: (PathHandlerM m) => SP -> DP -> m ()
 copyHtmlAndRecord s d = do
   guard $ getExt d == "htm"
@@ -165,13 +165,7 @@ copyHtmlAndRecord s d = do
   recordHtmlLinks str d
     
 
-copyAnything :: (PathHandlerM m) => SP -> DP -> m ()
-copyAnything s d = do
-  str <- readByteStringL s
-  writeByteStringL d str
 
-
-----
 recordHtmlLinks :: (PathHandlerM m) => String -> DP -> m ()
 recordHtmlLinks str dp = do
   links <- filterLinks $ extractLinkStrings str

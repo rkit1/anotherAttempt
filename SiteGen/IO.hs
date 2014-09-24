@@ -15,6 +15,7 @@ class MonadIO m => MonadSiteIO si di t m | m -> si di t where
   openSI :: si -> m Handle
   openDI :: di -> m Handle
   doesExistSI :: si -> m Bool
+  copySItoDI :: si -> di -> m ()
   checkTime :: si -> m t
   curTime :: m t
   
@@ -23,6 +24,7 @@ instance MonadSiteIO si di t m => MonadSiteIO si di t (DepRecord si di m) where
   openSI = lift . openSI
   openDI = lift . openDI
   doesExistSI = lift . doesExistSI
+  copySItoDI si di = lift $ copySItoDI si di
   checkTime = lift . checkTime
   curTime = lift curTime
 
@@ -30,6 +32,7 @@ instance MonadSiteIO si di t m => MonadSiteIO si di t (Peek si di m) where
   openSI = lift . openSI
   openDI = lift . openDI
   doesExistSI = lift . doesExistSI
+  copySItoDI si di = lift $ copySItoDI si di
   checkTime = lift . checkTime
   curTime = lift curTime
 
@@ -75,6 +78,7 @@ instance (Ord si, MonadSiteIO si di t m)
   openSI = lift . openSI
   openDI = lift . openDI
   doesExistSI = lift . doesExistSI
+  copySItoDI si di = lift $ copySItoDI si di
   curTime = lift curTime
   checkTime si = MemoTime $ do
     x <- get 

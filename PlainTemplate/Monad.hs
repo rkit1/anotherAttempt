@@ -125,6 +125,7 @@ instance MonadSiteIO si di t m => MonadSiteIO si di t (M m) where
   openSI = lift . openSI
   openDI = lift . openDI
   doesExistSI = lift . doesExistSI
+  copySItoDI si di = lift $ copySItoDI si di
   checkTime = lift . checkTime
   curTime = lift curTime
   

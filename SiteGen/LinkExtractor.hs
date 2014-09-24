@@ -14,5 +14,7 @@ extractLinkStrings str = parseTags str >>= f
       [ "a" % "href" 
       , "img" % "src" 
       , "link" % "href"
-      , "script" % "src" ]
+      , "script" % "src"
+      , "source" % "src"
+      , "div" % "href"]
     (%) = (,)

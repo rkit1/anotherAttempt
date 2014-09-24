@@ -1,6 +1,6 @@
 dependencies and package splitting
 catch exceptions in heads
-add copySItoDI
 decode urls
 record warnings
 redo finddepsource to read human-friendly urls
+recruting club

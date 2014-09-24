@@ -9,6 +9,7 @@ import SiteGen.Main
 import ClubviRu.Resource
 import System.IO
 import System.Directory
+import System.FilePath
 import Control.Applicative
 import Control.Monad.Base
 import Control.Monad.Trans.Control
@@ -64,6 +65,12 @@ instance (MonadIO m) =>
                   hSetEncoding h utf8
                   return h
     doesExistSI si = toFilePathM si >>= \ fp -> liftIO $ doesFileExist fp
+    copySItoDI si di = do
+      fps <- toFilePathM si
+      fpd <- toFilePathM di
+      liftIO $ do
+        createDirectoryIfMissing True $ takeDirectory fpd
+        copyFile fps fpd
     checkTime si = toFilePathM si >>= \ fp -> liftIO $ getModificationTime fp
     curTime = liftIO $ getCurrentTime 
 

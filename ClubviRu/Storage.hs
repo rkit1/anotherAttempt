@@ -47,6 +47,7 @@ instance MonadSiteIO SP DP UTCTime m
   openSI = lift . openSI
   openDI = lift . openDI
   doesExistSI = lift . doesExistSI
+  copySItoDI si di = lift $ copySItoDI si di
   checkTime = lift . checkTime
   curTime = lift curTime
   
