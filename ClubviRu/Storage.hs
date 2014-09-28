@@ -36,21 +36,6 @@ instance MonadTransControl AcidDepDB where
      liftWith = defaultLiftWith AcidDepDB unAcidDepDB StAcidDepDB
      restoreT = defaultRestoreT AcidDepDB unStAcidDepDB
 
-instance SiteConfig m => SiteConfig (AcidDepDB m) where
-  sourceRoot = lift sourceRoot
-  destinationRoot = lift destinationRoot
-  storeRoot = lift storeRoot
-  myDomains = lift myDomains 
-
-instance MonadSiteIO SP DP UTCTime m
-  => MonadSiteIO SP DP UTCTime (AcidDepDB m) where
-  openSI = lift . openSI
-  openDI = lift . openDI
-  doesExistSI = lift . doesExistSI
-  copySItoDI si di = lift $ copySItoDI si di
-  checkTime = lift . checkTime
-  curTime = lift curTime
-  
 instance Monad m => Functor (AcidDepDB m) where
   fmap = liftM
 
@@ -126,3 +111,5 @@ returnStorage = do
   closeAcidState db
   return d
   
+$(deriveMonadSiteIO $ \ si di t -> [t|AcidDepDB|])
+$(deriveSiteConfig [t|AcidDepDB|])

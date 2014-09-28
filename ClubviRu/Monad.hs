@@ -1,5 +1,6 @@
-{-# LANGUAGE RecordWildCards, GeneralizedNewtypeDeriving, FlexibleInstances, 
-  MultiParamTypeClasses, UndecidableInstances, OverloadedStrings, TypeFamilies #-}
+{-# LANGUAGE RecordWildCards, GeneralizedNewtypeDeriving, FlexibleInstances
+  , MultiParamTypeClasses, UndecidableInstances, OverloadedStrings, TypeFamilies
+  , TemplateHaskell #-}
 module ClubviRu.Monad where
 import ClubviRu.Config.Site
 import Network.URI
@@ -20,17 +21,6 @@ import Control.Monad.Trans.Control
 newtype ClubviRuMonad m a = ClubviRuMonad {runClubviRu :: m a} 
   deriving (Monad, MonadIO, Functor, Applicative)
 
-instance (MonadIO m, DepRecordMonad m si di) => 
-  DepRecordMonad (ClubviRuMonad m) si di where
-    recordSI = lift . recordSI
-    recordDI = lift . recordDI
-
-
-instance DepDBMonad m si di t => DepDBMonad (ClubviRuMonad m) si di t where
-  recordDeps d dt = lift $ recordDeps d dt
-  lookupDeps d = lift $ lookupDeps d
-
-
 instance MonadTrans ClubviRuMonad where
   lift = ClubviRuMonad
 
@@ -49,7 +39,6 @@ instance MonadTransControl ClubviRuMonad where
   liftWith f = ClubviRuMonad $ f $ liftM StClubvi . runClubviRu
   restoreT = ClubviRuMonad . liftM unStClubvi
 
-
 instance (MonadIO m) => 
   MonadSiteIO SourcePath DestinationPath UTCTime (ClubviRuMonad m) where
     openDI di@Resource{..} = do
@@ -61,11 +50,11 @@ instance (MonadIO m) =>
         hSetEncoding h utf8
         return h
     openSI si = toFilePathM si >>= \ fp -> liftIO $ do
-                  h <- openFile fp ReadMode
-                  hSetEncoding h utf8
-                  return h
+      h <- openFile fp ReadMode
+      hSetEncoding h utf8
+      return h
     doesExistSI si = toFilePathM si >>= \ fp -> liftIO $ doesFileExist fp
-    copySItoDI si di = do
+    copySItoDI_ si di = do
       fps <- toFilePathM si
       fpd <- toFilePathM di
       liftIO $ do
@@ -82,3 +71,6 @@ instance Monad m => SiteConfig (ClubviRuMonad m) where
   storeRoot = 
     return "c:/Users/Victor/Documents/wrk/newsite/anotherAttemptStore/"
   myDomains = return ["clubvi.ru", "www.clubvi.ru"]
+
+$(deriveDepDBMonad $ \ si di t -> [t|ClubviRuMonad|])
+$(deriveDepRecordMonad $ \ si di -> [t|ClubviRuMonad|])

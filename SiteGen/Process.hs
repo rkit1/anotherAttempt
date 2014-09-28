@@ -10,12 +10,13 @@ import SiteGen.DepRecord
 import SiteGen.IO
 
 process :: (Ord di, Monad m) 
-  => (di -> m (S.Set di)) -- ^ Actual processing goes here.
+  => (S.Set di)           -- ^ Initial destinations.
+  -> (di -> m (S.Set di)) -- ^ Actual processing goes here.
                           -- Return set of destinations found 
                           -- while processing current destination.
-  -> (S.Set di)           -- ^ Initial destinations.
+
   -> m ()
-process process set = go S.empty set
+process set process = go S.empty set
   where
     go !done !queue 
      | Nothing <- S.minView queue = return ()

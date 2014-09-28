@@ -48,24 +48,6 @@ instance Monad m => MonadState DP (PathHandler m) where
 instance MonadTrans PathHandler where
   lift m = PH $ lift $ lift m
 
-instance MonadSiteIO si di t m => MonadSiteIO si di t (PathHandler m) where
-  openSI = lift . openSI
-  openDI = lift . openDI
-  doesExistSI = lift . doesExistSI
-  copySItoDI si di = lift $ copySItoDI si di
-  checkTime = lift . checkTime
-  curTime = lift curTime
-
-instance SiteConfig m => SiteConfig (PathHandler m) where
-  sourceRoot = lift sourceRoot
-  destinationRoot = lift destinationRoot
-  storeRoot = lift storeRoot
-  myDomains = lift myDomains
-  
-instance DepRecordMonad m SP DP => DepRecordMonad (PathHandler m) SP DP where
-  recordSI = lift . recordSI
-  recordDI = lift . recordDI
-
 class
   ( DepRecordMonad m SP DP
   , SiteConfig m
@@ -170,3 +152,8 @@ recordHtmlLinks :: (PathHandlerM m) => String -> DP -> m ()
 recordHtmlLinks str dp = do
   links <- filterLinks $ extractLinkStrings str
   forM_ links $ \ l -> recordDI $ fromString l `relativeTo` dp
+
+$(deriveMonadSiteIO $ \ si di t -> [t|PathHandler|])
+$(deriveDepRecordMonad $ \ si di -> [t|PathHandler|])
+$(deriveSiteConfig [t|PathHandler|])
+

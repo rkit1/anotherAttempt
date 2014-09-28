@@ -15,11 +15,10 @@ import System.IO
 
 main :: IO ()
 main = do
-  runClubviRu $ runAcidDepDB $ process
-    ( runDepRecordAndReport $ \ d -> do
+  runClubviRu $ runAcidDepDB $ process (S.fromList ["/index.htm"])
+    $ runDepRecordAndReport $ \ d -> do
       r <- runPathHandler d clubviRoute
       case r of
         Right _ -> return Nothing
-        Left err -> liftIO $ putStrLn err >> return (Just err))
-    $ S.fromList ["/index.htm"]
+        Left err -> liftIO $ putStrLn err >> return (Just err)
 

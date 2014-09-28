@@ -1,6 +1,6 @@
 {-# LANGUAGE ExistentialQuantification, MultiParamTypeClasses
   , FunctionalDependencies, FlexibleInstances, TypeFamilies, UndecidableInstances
-  , GeneralizedNewtypeDeriving #-}
+  , GeneralizedNewtypeDeriving, TemplateHaskell #-}
 module SiteGen.DepRecord where
 import qualified Data.Set as S
 import qualified Data.Map as M
@@ -9,6 +9,7 @@ import Control.Monad.State.Strict
 import Control.Applicative
 import Control.Monad.Trans.Control
 import Control.Monad.Base
+import Language.Haskell.TH
 
 class Monad m => DepRecordMonad m si di | m -> si di where
   recordSI :: si -> m ()
@@ -60,3 +61,13 @@ instance MonadTrans (Peek si di) where
 instance DepRecordMonad m si di => DepRecordMonad (Peek si di m) si di where
   recordSI _ = return ()
   recordDI _ = return ()
+
+deriveDepRecordMonad :: (Q Type -> Q Type -> TypeQ) -> Q [Dec]
+deriveDepRecordMonad mf = do
+  [si, di] <- forM ["si", "di"] $ \ n -> return . VarT <$> newName n
+  [d|
+    instance (DepRecordMonad m $si $di) 
+      => DepRecordMonad ($(mf si di) m) $si $di where
+        recordSI = lift . recordSI
+        recordDI = lift . recordDI
+    |]

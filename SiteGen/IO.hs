@@ -1,4 +1,6 @@
-{-# LANGUAGE MultiParamTypeClasses, RecordWildCards, FlexibleInstances, GeneralizedNewtypeDeriving, FunctionalDependencies, UndecidableInstances #-}
+{-# LANGUAGE MultiParamTypeClasses, RecordWildCards, FlexibleInstances
+  , GeneralizedNewtypeDeriving, FunctionalDependencies, UndecidableInstances
+  , TemplateHaskell #-}
 module SiteGen.IO where
 import System.IO
 import Control.Monad.Reader
@@ -10,21 +12,40 @@ import Control.Monad.State.Strict
 import Control.Applicative
 import qualified Data.Set as S
 import Control.Monad.Trans.Maybe
+import Language.Haskell.TH
 
 class MonadIO m => MonadSiteIO si di t m | m -> si di t where
   openSI :: si -> m Handle
   openDI :: di -> m Handle
   doesExistSI :: si -> m Bool
-  copySItoDI :: si -> di -> m ()
+  copySItoDI_ :: si -> di -> m ()
   checkTime :: si -> m t
   curTime :: m t
+
+deriveMonadSiteIO
+  :: (Q Type -> Q Type -> Q Type -> TypeQ) -> Q [Dec]
+deriveMonadSiteIO mf = do
+  si <- return . VarT <$> newName "si"
+  di <- return . VarT <$> newName "di"
+  t  <- return . VarT <$> newName "t"
+  [d|
+    instance MonadSiteIO $si $di $t m 
+        => MonadSiteIO $si $di $t ($(mf si di t) m) where
+      openSI = lift . openSI
+      openDI = lift . openDI
+      doesExistSI = lift . doesExistSI
+      copySItoDI_ si di = lift $ copySItoDI_ si di
+      checkTime = lift . checkTime
+      curTime = lift curTime
+    |]
+
   
 
 instance MonadSiteIO si di t m => MonadSiteIO si di t (DepRecord si di m) where
   openSI = lift . openSI
   openDI = lift . openDI
   doesExistSI = lift . doesExistSI
-  copySItoDI si di = lift $ copySItoDI si di
+  copySItoDI_ si di = lift $ copySItoDI_ si di
   checkTime = lift . checkTime
   curTime = lift curTime
 
@@ -32,9 +53,14 @@ instance MonadSiteIO si di t m => MonadSiteIO si di t (Peek si di m) where
   openSI = lift . openSI
   openDI = lift . openDI
   doesExistSI = lift . doesExistSI
-  copySItoDI si di = lift $ copySItoDI si di
+  copySItoDI_ si di = lift $ copySItoDI_ si di
   checkTime = lift . checkTime
   curTime = lift curTime
+
+
+copySItoDI :: (MonadSiteIO si di t m, DepRecordMonad m si di)
+  => si -> di -> m ()
+copySItoDI si di = recordSI si >> copySItoDI_ si di
 
 readString :: (DepRecordMonad m si di, MonadSiteIO si di t m) 
   => si -> m String
@@ -78,7 +104,7 @@ instance (Ord si, MonadSiteIO si di t m)
   openSI = lift . openSI
   openDI = lift . openDI
   doesExistSI = lift . doesExistSI
-  copySItoDI si di = lift $ copySItoDI si di
+  copySItoDI_ si di = lift $ copySItoDI_ si di
   curTime = lift curTime
   checkTime si = MemoTime $ do
     x <- get 
