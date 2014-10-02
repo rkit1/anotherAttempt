@@ -1,4 +1,5 @@
-{-# LANGUAGE RecordWildCards, TemplateHaskell, FlexibleContexts, ScopedTypeVariables #-}
+{-# LANGUAGE RecordWildCards, TemplateHaskell, FlexibleContexts, ScopedTypeVariables
+  #-}
 module ClubviRu.Date where
 import Text.Parsec
 import Library
@@ -83,15 +84,15 @@ months =
     (%) = (,)
 
 
-
-
-peekMonths :: (HasSiteIO SP di t r, HasDepRecord SP di r, MonadIO (Eff r))
+peekMonths :: forall di t r
+  .  (HasSiteIO SP di t r, HasDepRecord SP di r)
   => SP -> String -> Eff r [Date]
 peekMonths prefix str = lastStep `liftM` foldM go S.empty ls
   where
     ls = selectLines str
     lastStep s = map getDate $ S.toList s
-    getDate str = const NullDate <++> id $ parse dateParser "" str    
+    getDate str = const NullDate <++> id $ parse dateParser "" str
+    go :: S.Set String -> String -> Eff r (S.Set String)
     go s l | Just fp <- "!list:" `stripPrefix` l = do
       let p = fromString fp `relativeTo` prefix
       str <- peek $ readString p          
@@ -100,12 +101,14 @@ peekMonths prefix str = lastStep `liftM` foldM go S.empty ls
     go s l = return $! S.insert (fromString l) s
 
     
-queryMonth :: (HasSiteIO SP di t r, HasDepRecord SP di r, MonadIO (Eff r))
+queryMonth :: forall di t r
+  .  (HasSiteIO SP di t r, HasDepRecord SP di r)
   => SP -> String -> Date -> Eff r [SP]
 queryMonth prefix str d = concat `liftM` forM ls withLine
   where
     ls = selectLines str
     getDate str = const NullDate <++> id $ parse dateParser "" str
+    withLine :: String -> Eff r [SP]
     withLine l | Just fp <- "!list:" `stripPrefix` l = do
       let p = fromString fp `relativeTo` prefix
       str <- peek $ readString p
@@ -116,11 +119,13 @@ queryMonth prefix str d = concat `liftM` forM ls withLine
       return ls
     withLine l = return [ fromString l | getDate l == d ]
 
-queryLines :: (HasSiteIO SP di t r, HasDepRecord SP di r, MonadIO (Eff r))
+queryLines :: forall di t r
+  .  (HasSiteIO SP di t r, HasDepRecord SP di r)
   => SP -> String -> Int -> Eff r [SP]
 queryLines prefix str count = go ls count
   where
     ls = selectLines str
+    go :: [String] -> Int -> Eff r [SP]
     go [] _ = return []
     go _  0 = return []
     go (l:ls) count

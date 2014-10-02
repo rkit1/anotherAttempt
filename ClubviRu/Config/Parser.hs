@@ -6,15 +6,16 @@ import Text.Peggy
 import SiteGen.IO as IO
 import SiteGen.Main
 import Control.Monad
+import Control.Eff
 
-
-parseConfigFile :: MonadIO m => FilePath -> m (Either ParseError (M.Map String String))
+parseConfigFile :: MonadIO m
+  => FilePath -> m (Either ParseError (M.Map String String))
 parseConfigFile fp = liftIO $ do
   a <- parseFile configParser fp
   return $ fmap linesToMap a
 
-readConfig :: (DepRecordMonad m si di, MonadSiteIO si di t m)
-  => si -> m (Either ParseError (M.Map String String))
+readConfig :: (HasDepRecord si di r, HasSiteIO si di t r)
+  => si -> Eff r (Either ParseError (M.Map String String))
 readConfig res = parseConfig `liftM` IO.readString res
 
 parseConfig :: String -> Either ParseError (M.Map String String)

@@ -41,15 +41,18 @@ data SiteIO si di t a
 
 
 --
-class ( Member (SiteIO si di t) r
-      , Ord si, Ord di, Ord t, Typeable  si, Typeable di, Typeable t)
+class ( Ord si, Ord di, Ord t, Typeable  si, Typeable di, Typeable t
+      , Member (SiteIO si di t) r
+      , MonadIO (Eff r) )
       => HasSiteIO si di t r | r -> si di t
 
-instance (Ord si, Ord di, Ord t, Typeable  si, Typeable di, Typeable t)
+instance ( Ord si, Ord di, Ord t, Typeable  si, Typeable di, Typeable t
+         , MonadIO (Eff (SiteIO si di t :> r)) )
          => HasSiteIO si di t (SiteIO si di t :> r)
 
-instance ( HasSiteIO si di t r
-         , Ord si, Ord di, Ord t, Typeable  si, Typeable di, Typeable t)
+instance ( Ord si, Ord di, Ord t, Typeable  si, Typeable di, Typeable t
+         , HasSiteIO si di t r
+         , MonadIO (Eff (a :> r)) )
          => HasSiteIO si di t (a :> r)      
 
 --

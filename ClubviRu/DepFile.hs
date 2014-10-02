@@ -10,8 +10,7 @@ import Control.Monad.Trans
 -- | Вывод релативен!!!
 readDepFile :: 
   ( HasDepRecord SP di r
-  , HasSiteIO SP di t r
-  , MonadIO (Eff r)) 
+  , HasSiteIO SP di t r ) 
   => SP -> Eff r [DP]
 readDepFile si = do
   ls <- readString si
