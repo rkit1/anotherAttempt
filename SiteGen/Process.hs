@@ -1,13 +1,13 @@
-{-# LANGUAGE ScopedTypeVariables, BangPatterns, MultiParamTypeClasses
+{-# LANGUAGE ScopedTypeVariables, BangPatterns, MultiParamTypeClasses, TypeOperators
  , FunctionalDependencies, GeneralizedNewtypeDeriving, FlexibleInstances
  , UndecidableInstances, TypeFamilies, ExistentialQuantification #-}
 module SiteGen.Process where
 import qualified Data.Set as S
 import qualified Data.Map.Strict as M
-import Control.Monad.State.Strict
 import SiteGen.DepDB
 import SiteGen.DepRecord
 import SiteGen.IO
+import Control.Eff
 
 process :: (Ord di, Monad m) 
   => (S.Set di)           -- ^ Initial destinations.
@@ -24,25 +24,28 @@ process set process = go S.empty set
        ds <- process dst
        let done' = S.insert dst done
            queue' = queueTail `S.union` (ds `S.difference` done')
-       go done' queue'   
+       go done' queue'
 
-runDepRecordAndReport ::
-  (MonadSiteIO si di t m, DepDBMonad m si a t, Ord t)
-  => (a -> DepRecord si a m (Maybe String)) -> a -> m (S.Set a)
-runDepRecordAndReport f di = do
-  deps <- lookupDeps di
-  let doit = do
-        res <- runDepRecord (f di)
-        t <- curTime 
-        case res of
-          Left err -> do
-            recordDeps di $ Left err
-            return S.empty
-          Right (ss, dd) -> do
-            recordDeps di $ Right (t, ss, dd)
-            return dd
-  case deps of
-    Just (Right (t, ss, dd)) -> do
+
+
+runDepRecordAndReport :: (HasDepDB si di t r, HasSiteIO si di t r)
+  => (di -> Eff (DepRecord si di :> r) (Maybe String))
+  -> di -> Eff r (S.Set di)
+runDepRecordAndReport f di = lookupDeps di >>= go
+  where
+    go (Just (Right (t, ss, dd))) = do
       c <- checkForChanges t ss
       if c then doit else return dd
-    _ -> doit
+    go _ = doit
+    
+    doit = do
+      ((ss, dd), res) <- runDepRecord (f di)
+      t <- curTime 
+      case res of
+       Just err -> do
+         recordDeps di $ Left err
+         return S.empty
+       Nothing  -> do
+         recordDeps di $ Right (t, ss, dd)
+         return dd
+
