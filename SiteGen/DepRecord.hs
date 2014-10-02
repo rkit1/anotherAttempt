@@ -1,73 +1,75 @@
 {-# LANGUAGE ExistentialQuantification, MultiParamTypeClasses
   , FunctionalDependencies, FlexibleInstances, TypeFamilies, UndecidableInstances
-  , GeneralizedNewtypeDeriving, TemplateHaskell #-}
+  , GeneralizedNewtypeDeriving, TemplateHaskell, FlexibleContexts
+  , DeriveDataTypeable, ScopedTypeVariables, TypeOperators
+  , DeriveFunctor, OverlappingInstances  #-}
 module SiteGen.DepRecord where
+import Control.Eff
+import Control.Eff.Writer.Strict
 import qualified Data.Set as S
-import qualified Data.Map as M
-import SiteGen.DepDB
-import Control.Monad.State.Strict
-import Control.Applicative
-import Control.Monad.Trans.Control
-import Control.Monad.Base
-import Language.Haskell.TH
+import Data.Typeable
+import Data.Monoid
+import Data.Functor
 
-class Monad m => DepRecordMonad m si di | m -> si di where
-  recordSI :: si -> m ()
-  recordDI :: di -> m ()
+data DepRecord si di v = DepRecord (Either si di) v
+  deriving (Typeable, Functor)
 
-instance (Monad m, Ord si, Ord di) => DepRecordMonad (DepRecord si di m) si di where
-  recordSI si = DepRecord $ modify $ \ (ss, dd) -> (S.insert si ss, dd)
-  recordDI di = DepRecord $ modify $ \ (ss, dd) -> (ss, S.insert di dd)
+--
+class ( Member (DepRecord si di) r
+      , Ord si, Ord di, Typeable  si, Typeable di)
+      => HasDepRecord si di r | r -> si di
 
-newtype DepRecord si di m a
-  = DepRecord { unDepRecord :: StateT (S.Set si, S.Set di) m a}
-  deriving (Monad, MonadIO, MonadTrans, Applicative, Functor)
+instance (Ord si, Ord di, Typeable  si, Typeable di)
+         => HasDepRecord si di (DepRecord si di :> t)
 
-instance MonadBaseControl b m => MonadBaseControl b (DepRecord si di m) where
-  newtype StM (DepRecord si di m) a
-    = StMDepRecord {unStMDepRecord :: ComposeSt (DepRecord si di) m a}
-  liftBaseWith = defaultLiftBaseWith StMDepRecord
-  restoreM     = defaultRestoreM   unStMDepRecord
+instance ( HasDepRecord si di r
+         , Ord si, Ord di, Typeable  si, Typeable di)
+         => HasDepRecord si di (t :> r)
 
-instance (Functor m, Monad m, MonadBase b m)
-  => MonadBase b (DepRecord si di m) where
-  liftBase = liftBaseDefault 
+--
 
-instance MonadTransControl (DepRecord si di) where
-  newtype StT (DepRecord si di) a
-    = StDepRecord {unStDepRecord :: StT (StateT (S.Set si, S.Set di)) a}
-  liftWith = defaultLiftWith DepRecord unDepRecord StDepRecord
-  restoreT = defaultRestoreT DepRecord unStDepRecord
-
-runDepRecord :: Monad m
-  => DepRecord si di m (Maybe String)
-     -> m (Either String (S.Set si, S.Set di))
-runDepRecord (DepRecord m) = do
-  (a, sets) <- runStateT m (S.empty, S.empty)
-  case a of
-    Nothing ->  return $ Right (sets)
-    Just err -> return $ Left err
+runDepRecord :: (Typeable di, Typeable si, Ord di, Ord si)
+  => Eff (DepRecord si di :> r) a -> Eff r ((S.Set si, S.Set di), a)
+runDepRecord m = loop (S.empty, S.empty) $ admin m
+  where
+    loop st@(ss, ds) (Val x) = return (st, x)
+    loop st@(ss, ds) (E u)   = handleRelay u (loop st) f
+      where
+        f (DepRecord i k)
+          | Left  si <- i = loop (si `S.insert` ss, ds) k
+          | Right di <- i = loop (ss, di `S.insert` ds) k
 
 
-newtype Peek si di m a = Peek { peek_ :: m a }
-  deriving (Monad, MonadIO, Applicative, Functor)
+peek :: forall si di r a. (HasDepRecord si di r)
+  => Eff r a -> Eff r a
+peek m = loop $ admin m
+  where
+    loop (Val x) = return x
+    loop (E u) =  interpose u loop f
+      where
+        f :: DepRecord si di (VE r a) -> Eff r a
+        f (DepRecord _ k) = loop k
 
-peek :: DepRecordMonad m si di => Peek si di m a -> m a
-peek = peek_
+--
 
-instance MonadTrans (Peek si di) where
-  lift = Peek
+recordSI :: forall si di r.
+  (HasDepRecord si di r) => si -> Eff r ()
+recordSI si = send $ \ f ->
+  inj (DepRecord (Left si :: Either si di) $ f ())
 
-instance DepRecordMonad m si di => DepRecordMonad (Peek si di m) si di where
-  recordSI _ = return ()
-  recordDI _ = return ()
 
-deriveDepRecordMonad :: (Q Type -> Q Type -> TypeQ) -> Q [Dec]
-deriveDepRecordMonad mf = do
-  [si, di] <- forM ["si", "di"] $ \ n -> return . VarT <$> newName n
-  [d|
-    instance (DepRecordMonad m $si $di) 
-      => DepRecordMonad ($(mf si di) m) $si $di where
-        recordSI = lift . recordSI
-        recordDI = lift . recordDI
-    |]
+recordDI :: forall si di r.
+  (HasDepRecord si di r) => di -> Eff r ()   
+recordDI di = send $ \ f ->
+  inj (DepRecord (Right di :: Either si di) $ f ())
+
+
+{-
+test :: ((S.Set String, S.Set Int), ())
+test = run $ runDepRecord $ do
+  recordSI "asd"
+  recordDI 123
+  peek $ recordDI 321
+  recordSI "dsa"  
+
+-}
