@@ -1,32 +1,32 @@
 {-# LANGUAGE StandaloneDeriving, KindSignatures, GeneralizedNewtypeDeriving
-  , TemplateHaskell #-}
+  , TemplateHaskell, DeriveDataTypeable, FlexibleContexts, FlexibleInstances
+  , UndecidableInstances #-}
 
 module ClubviRu.Config.Site where
 import SiteGen.Main
-import Control.Monad.Trans
-import Language.Haskell.TH
+import Data.Typeable
+import Data.Functor
+import Control.Eff
+import Control.Eff.Reader.Strict
 
-class Monad m => SiteConfig m where
-  sourceRoot :: m FilePath
-  destinationRoot :: m FilePath
-  storeRoot :: m FilePath
-  myDomains :: m [String]
+data SiteConfig = SiteConfig
+  { sourceRoot_ :: FilePath
+  , destionationRoot_ :: FilePath
+  , storeRoot_ :: FilePath
+  , myDomains_ :: [String] }
+  deriving (Typeable)
 
-instance (SiteConfig m) => SiteConfig (DepRecord si di m)  where
-  sourceRoot = lift sourceRoot
-  destinationRoot = lift destinationRoot
-  storeRoot = lift storeRoot
-  myDomains = lift myDomains
+class Member (Reader SiteConfig) r => HasSiteConfig r
+instance Member (Reader SiteConfig) r => HasSiteConfig r
 
+sourceRoot :: HasSiteConfig r => Eff r FilePath
+sourceRoot = sourceRoot_ <$> ask
 
-deriveSiteConfig :: TypeQ -> DecsQ
-deriveSiteConfig mf = do
-  [d|
-    instance (SiteConfig m) => SiteConfig ($mf m)  where
-      sourceRoot = lift sourceRoot
-      destinationRoot = lift destinationRoot
-      storeRoot = lift storeRoot
-      myDomains = lift myDomains
-    |]
+destinationRoot :: HasSiteConfig r => Eff r FilePath
+destinationRoot = destionationRoot_ <$> ask
 
+storeRoot :: HasSiteConfig r => Eff r FilePath
+storeRoot = storeRoot_ <$> ask
 
+myDomains :: HasSiteConfig r => Eff r [String]
+myDomains = myDomains_ <$> ask

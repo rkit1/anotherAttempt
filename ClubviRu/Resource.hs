@@ -6,6 +6,7 @@ import Data.String
 import ClubviRu.Config.Site
 import Control.Monad.Error
 import Data.Data
+import Control.Eff
 
 ----
 type SourcePath = Resource Source
@@ -19,8 +20,8 @@ data Source
 data Destination
   deriving (Typeable)
 
-class ResType r where
-  resRoot :: SiteConfig m => Resource r -> m FilePath
+class ResType t where
+  resRoot :: HasSiteConfig r => Resource t -> Eff r FilePath
 
 instance ResType Source where
   resRoot _ = sourceRoot
@@ -51,7 +52,7 @@ instance IsString (Resource a) where
 
 
 ----
-toFilePathM :: (SiteConfig m, ResType r) => Resource r -> m FilePath
+toFilePathM :: (HasSiteConfig r, ResType t) => Resource t -> Eff r FilePath
 toFilePathM res = do
   root <- resRoot res
   return $ toFilePath root res
@@ -63,7 +64,7 @@ toFilePath root Resource{..} =
       concat [ T.unpack x ++ "/" | x <- removeBeginningUps Absolute resPath] ++ 
       T.unpack resName
 
-toDirectoryPathM :: (SiteConfig m, ResType r) => Resource r -> m FilePath
+toDirectoryPathM :: (HasSiteConfig r, ResType t) => Resource t -> Eff r FilePath
 toDirectoryPathM res = do
   root <- resRoot res
   return $ toDirectoryPath root res

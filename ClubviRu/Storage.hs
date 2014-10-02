@@ -1,4 +1,4 @@
-{-# LANGUAGE TemplateHaskell, GeneralizedNewtypeDeriving, TypeFamilies
+{-# LANGUAGE TemplateHaskell, GeneralizedNewtypeDeriving, TypeFamilies, TypeOperators
   , DeriveDataTypeable, TypeSynonymInstances, FlexibleInstances
   , MultiParamTypeClasses, FlexibleContexts, UndecidableInstances #-}
 module ClubviRu.Storage where
@@ -18,6 +18,7 @@ import Control.Applicative
 import Control.Exception.Lifted
 import Control.Monad.Trans.Control
 import Control.Monad.Base
+import Control.Eff
 
 newtype AcidDepDB m a = AcidDepDB { unAcidDepDB :: ReaderT (AcidState DB) m a}
   deriving (Monad, MonadTrans, MonadIO)
@@ -59,7 +60,7 @@ lookupDeps_ di = do
 dumpDB :: Query DB DB
 dumpDB = ask
 
-newtype DB = DB (DepDBType SP DP UTCTime)
+newtype DB = DB (M.Map DP (DepDBRecord SP DP UTCTime))
   deriving (Typeable, Show)
 
 instance SafeCopy Source where
@@ -74,25 +75,27 @@ $(deriveSafeCopy 0 'base ''Resource)
 $(deriveSafeCopy 0 'base ''DB)
 $(makeAcidic ''DB ['recordDeps_, 'lookupDeps_, 'dumpDB])
 
-instance MonadIO m => DepDBMonad (AcidDepDB m) SP DP UTCTime where
-  recordDeps di dt = AcidDepDB $ do
-    r <- ask
-    liftIO $ update r $ RecordDeps_ di dt
-  lookupDeps di = AcidDepDB $ do
-    r <- ask
-    liftIO $ query r $ LookupDeps_ di
-
-
-runAcidDepDB :: (MonadIO m, SiteConfig m, MonadBaseControl IO m)
-  => AcidDepDB m b -> m b
-runAcidDepDB (AcidDepDB (ReaderT m)) = do
-  path <- storeRoot
-  liftBaseOp
-    (bracket
-      (openLocalStateFrom (path ++ "/deps/") $ DB M.empty)
-      (\ db -> createCheckpoint db >> closeAcidState db))
-    m
-
+runAcidDepDB :: ( MonadBaseControl IO (Eff r), MonadIO (Eff r), HasSiteConfig r)
+  => Eff (DepDB SP DP UTCTime :> r) b -> Eff r b
+runAcidDepDB m = storeRoot >>= f
+  where
+    f path = liftBaseOp
+      (bracket
+       (openLocalStateFrom (path ++ "/deps/") $ DB M.empty)
+       (\ db -> createCheckpoint db >> closeAcidState db))
+      g
+    g st = loop $ admin m
+      where
+        loop (Val e) = return e
+        loop (E u)   = handleRelay u loop f
+          where
+            f (RecordDeps di dat cont) = do
+              liftIO $ update st $ RecordDeps_ di dat
+              loop cont
+            f (LookupDeps di cont)     = do
+              res <- liftIO $ query st $ LookupDeps_ di              
+              loop $ cont res
+      
 
 dumpStorage :: IO ()
 dumpStorage = do
@@ -103,13 +106,10 @@ dumpStorage = do
   writeFile "c:/Users/Victor/Documents/wrk/newsite/anotherAttemptStore/dump"
     $ show d
 
-returnStorage :: IO (DepDBType SP DP UTCTime)
+returnStorage :: IO (M.Map DP (DepDBRecord SP DP UTCTime))
 returnStorage = do
   let path = "c:/Users/Victor/Documents/wrk/newsite/anotherAttemptStore/deps/"
   db <- openLocalStateFrom path $ DB M.empty
   DB d <- query db DumpDB
   closeAcidState db
   return d
-  
-$(deriveMonadSiteIO $ \ si di t -> [t|AcidDepDB|])
-$(deriveSiteConfig [t|AcidDepDB|])
