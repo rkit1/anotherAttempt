@@ -1,38 +1,54 @@
 {-# LANGUAGE MultiParamTypeClasses, FunctionalDependencies, FlexibleInstances
-  , GeneralizedNewtypeDeriving, TemplateHaskell #-}
+  , GeneralizedNewtypeDeriving, TypeOperators, FlexibleContexts
+  , UndecidableInstances, OverlappingInstances, DeriveDataTypeable, DeriveFunctor #-}
 module SiteGen.DepDB where
 import qualified Data.Set as S
 import qualified Data.Map as M
-import Control.Monad.State
+import Control.Eff
 import Control.Applicative
-import Language.Haskell.TH
+import Data.Typeable
 
-type DepDBType si di t = (M.Map di (Either String (t, S.Set si, S.Set di)))
-emptyDDBType = M.empty
+type DepDBRecord si di t = (Either String (t, S.Set si, S.Set di))
 
-newtype DepDB si di t m a = DepDB (StateT (DepDBType si di t) m a)
-  deriving (Monad, MonadIO, MonadTrans, Functor, Applicative)
+data DepDB si di t a
+  = RecordDeps di (DepDBRecord si di t) a
+  | LookupDeps di (Maybe (DepDBRecord si di t) -> a)
+    deriving (Typeable, Functor)
 
+--
+class ( Member (DepDB si di t) r
+      , Ord si, Ord di, Typeable  si, Typeable di, Typeable t)
+      => HasDepDB si di t r | r -> si di t
 
-runDepDB :: (Monad m, Ord si, Ord di)
-  => (DepDBType si di t) -> DepDB si di t m a -> m (DepDBType si di t)
-runDepDB i (DepDB m) = execStateT m i
+instance (Ord si, Ord di, Typeable  si, Typeable di, Typeable t)
+         => HasDepDB si di t (DepDB si di t :> r)
 
-class Monad m => DepDBMonad m si di t | m -> si di t where 
-  recordDeps :: di -> Either String (t, S.Set si, S.Set di) -> m ()
-  lookupDeps :: di -> m (Maybe (Either String (t, S.Set si, S.Set di)))
+instance ( HasDepDB si di t r
+         , Ord si, Ord di, Typeable  si, Typeable di, Typeable t)
+         => HasDepDB si di t (a :> r)
+--
 
-instance (Monad m, Ord si, Ord di) => DepDBMonad (DepDB si di t m) si di t where
-  recordDeps di dt = DepDB $ modify $ M.insert di dt
-  lookupDeps di = DepDB $ gets $ M.lookup di
+runDepDB
+  :: (Typeable si, Typeable di, Typeable t, Ord di, Ord si)
+  => Eff (DepDB si di t :> r) a -> Eff r a
+runDepDB m = loop M.empty $ admin m
+  where
+    loop m (Val x) = return x
+    loop m (E u)   = handleRelay u (loop m) f
+      where
+        f (RecordDeps di dat k) = loop (M.insert di dat m) k
+        f (LookupDeps di k)     = loop m (k $ M.lookup di m)
 
-deriveDepDBMonad
-  :: (Q Type -> Q Type -> Q Type -> TypeQ) -> Q [Dec]
-deriveDepDBMonad mf = do
-  [si, di, t] <- forM ["si", "di", "t"] $ \ n -> return . VarT <$> newName n
-  [d|
-    instance (DepDBMonad m $si $di $t) 
-      => DepDBMonad ($(mf si di t) m) $si $di $t where
-      recordDeps di dt = lift $ recordDeps di dt
-      lookupDeps di = lift $ lookupDeps di 
-    |]
+--
+
+recordDeps
+  :: (HasDepDB si di t r)
+  => di -> DepDBRecord si di t -> Eff r ()
+recordDeps di re = send $ \ f ->
+  inj (RecordDeps di re $ f ())
+
+lookupDeps
+  :: (HasDepDB si di t r)
+  => di -> Eff r (Maybe (DepDBRecord si di t))
+lookupDeps di = send $ \ f ->
+  inj (LookupDeps di f)
