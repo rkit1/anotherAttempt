@@ -4,6 +4,7 @@
   , FlexibleContexts, ScopedTypeVariables, BangPatterns
   #-}
 module SiteGen.IO where
+import Library
 import System.IO
 import SiteGen.DepRecord
 import qualified Data.ByteString as BS
@@ -178,3 +179,5 @@ runMemoTrie m = loop M.empty $ admin m
           Nothing -> do
             t <- checkTime si
             loop (M.insert si t m) $ k t
+        f _ = send (<$> u) >>= loop m
+

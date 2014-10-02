@@ -10,6 +10,7 @@ import Data.Char
 import Data.String
 import ClubviRu.Resource
 import qualified Data.Set as S
+import Control.Eff
 
 data Date
   = NullDate
@@ -53,6 +54,7 @@ readDate str = case parse (n `mplus` m) str str of
       string "г."
       return Date{..}
 
+pt :: SourceName -> Parsec SourceName () a -> Either ParseError a
 pt str m = parse m str str
 
 showDate Date{..} = printf "%s %dг." (showMonth dMonth) dYear
@@ -83,8 +85,8 @@ months =
 
 
 
-peekMonths :: (MonadSiteIO SP di t m, DepRecordMonad m SP di) =>
-              SP -> String -> m [Date]
+peekMonths :: (HasSiteIO SP di t r, HasDepRecord SP di r, MonadIO (Eff r))
+  => SP -> String -> Eff r [Date]
 peekMonths prefix str = lastStep `liftM` foldM go S.empty ls
   where
     ls = selectLines str
@@ -98,8 +100,8 @@ peekMonths prefix str = lastStep `liftM` foldM go S.empty ls
     go s l = return $! S.insert (fromString l) s
 
     
-queryMonth :: (MonadSiteIO SP di t m, DepRecordMonad m SP di) =>
-             SP -> String -> Date -> m [SP]
+queryMonth :: (HasSiteIO SP di t r, HasDepRecord SP di r, MonadIO (Eff r))
+  => SP -> String -> Date -> Eff r [SP]
 queryMonth prefix str d = concat `liftM` forM ls withLine
   where
     ls = selectLines str
@@ -114,8 +116,8 @@ queryMonth prefix str d = concat `liftM` forM ls withLine
       return ls
     withLine l = return [ fromString l | getDate l == d ]
 
-queryLines :: (MonadSiteIO SP di t m, DepRecordMonad m SP di) =>
-              SP -> String -> Int -> m [SP]
+queryLines :: (HasSiteIO SP di t r, HasDepRecord SP di r, MonadIO (Eff r))
+  => SP -> String -> Int -> Eff r [SP]
 queryLines prefix str count = go ls count
   where
     ls = selectLines str

@@ -3,9 +3,10 @@ module ClubviRu.URIParser where
 import Text.Peggy
 import ClubviRu.Config.Site
 import Data.List
+import Control.Eff
 
 
-filterLinks :: SiteConfig m => [String] -> m [String]
+filterLinks :: HasSiteConfig r => [String] -> Eff r [String]
 filterLinks links = do
   dmns <- myDomains
   let

@@ -4,13 +4,15 @@ import ClubviRu.Resource
 import SiteGen.Main
 import Data.Char
 import Data.String
-
+import Control.Eff
+import Control.Monad.Trans
 
 -- | Вывод релативен!!!
 readDepFile :: 
-  ( DepRecordMonad m SP di
-  , MonadSiteIO SP di t m) 
-  => SP -> m [DP]
+  ( HasDepRecord SP di r
+  , HasSiteIO SP di t r
+  , MonadIO (Eff r)) 
+  => SP -> Eff r [DP]
 readDepFile si = do
   ls <- readString si
   return [ fromString l | l <- lines ls, not $ all isSpace l ]
