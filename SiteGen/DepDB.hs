@@ -1,9 +1,10 @@
 {-# LANGUAGE MultiParamTypeClasses, FunctionalDependencies, FlexibleInstances
-  , GeneralizedNewtypeDeriving, TypeOperators, FlexibleContexts
-  , UndecidableInstances, OverlappingInstances, DeriveDataTypeable, DeriveFunctor #-}
+  , GeneralizedNewtypeDeriving, TypeOperators, FlexibleContexts, BangPatterns
+  , UndecidableInstances, OverlappingInstances, DeriveDataTypeable, DeriveFunctor
+  #-}
 module SiteGen.DepDB where
 import qualified Data.Set as S
-import qualified Data.Map as M
+import qualified Data.Map.Strict as M
 import Control.Eff
 import Control.Applicative
 import Data.Typeable
@@ -33,8 +34,8 @@ runDepDB
   => Eff (DepDB si di t :> r) a -> Eff r a
 runDepDB m = loop M.empty $ admin m
   where
-    loop m (Val x) = return x
-    loop m (E u)   = handleRelay u (loop m) f
+    loop !m (Val x) = return x
+    loop !m (E u)   = handleRelay u (loop m) f
       where
         f (RecordDeps di dat k) = loop (M.insert di dat m) k
         f (LookupDeps di k)     = loop m (k $ M.lookup di m)

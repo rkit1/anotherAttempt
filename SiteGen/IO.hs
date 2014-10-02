@@ -1,135 +1,156 @@
-{-# LANGUAGE MultiParamTypeClasses, RecordWildCards, FlexibleInstances
+{-# LANGUAGE MultiParamTypeClasses, RecordWildCards, FlexibleInstances, TypeOperators
   , GeneralizedNewtypeDeriving, FunctionalDependencies, UndecidableInstances
-  , TemplateHaskell #-}
+  , TemplateHaskell, DeriveDataTypeable, DeriveFunctor, OverlappingInstances
+  , FlexibleContexts, ScopedTypeVariables, BangPatterns
+  #-}
 module SiteGen.IO where
 import System.IO
-import Control.Monad.Reader
 import SiteGen.DepRecord
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as LBS
 import qualified Data.Map as M
-import Control.Monad.State.Strict
 import Control.Applicative
 import qualified Data.Set as S
-import Control.Monad.Trans.Maybe
+import Data.Typeable
 import Language.Haskell.TH
+import Control.Eff
+import Control.Monad.Trans
+import Control.Monad
 
-class MonadIO m => MonadSiteIO si di t m | m -> si di t where
-  openSI :: si -> m Handle
-  openDI :: di -> m Handle
-  doesExistSI :: si -> m Bool
-  copySItoDI_ :: si -> di -> m ()
-  checkTime :: si -> m t
-  curTime :: m t
-
-deriveMonadSiteIO
-  :: (Q Type -> Q Type -> Q Type -> TypeQ) -> Q [Dec]
-deriveMonadSiteIO mf = do
-  si <- return . VarT <$> newName "si"
-  di <- return . VarT <$> newName "di"
-  t  <- return . VarT <$> newName "t"
-  [d|
-    instance MonadSiteIO $si $di $t m 
-        => MonadSiteIO $si $di $t ($(mf si di t) m) where
-      openSI = lift . openSI
-      openDI = lift . openDI
-      doesExistSI = lift . doesExistSI
-      copySItoDI_ si di = lift $ copySItoDI_ si di
-      checkTime = lift . checkTime
-      curTime = lift curTime
-    |]
-
-  
-
-instance MonadSiteIO si di t m => MonadSiteIO si di t (DepRecord si di m) where
-  openSI = lift . openSI
-  openDI = lift . openDI
-  doesExistSI = lift . doesExistSI
-  copySItoDI_ si di = lift $ copySItoDI_ si di
-  checkTime = lift . checkTime
-  curTime = lift curTime
-
-instance MonadSiteIO si di t m => MonadSiteIO si di t (Peek si di m) where
-  openSI = lift . openSI
-  openDI = lift . openDI
-  doesExistSI = lift . doesExistSI
-  copySItoDI_ si di = lift $ copySItoDI_ si di
-  checkTime = lift . checkTime
-  curTime = lift curTime
+data SiteIO si di t a
+  = OpenSI
+    { si :: si
+    , result1 :: Handle -> a }
+  | OpenDI
+    { di :: di
+    , result2 :: Handle -> a }
+  | DoesExistSI
+    { si :: si
+    , result3 :: Bool -> a }
+  | CopySIToDI
+    { si :: si
+    , di :: di
+    , result4 :: () -> a }
+  | CheckTime
+    { si :: si
+    , result5 :: t -> a }
+  | CurTime
+    { result6 :: t -> a }
+  deriving (Typeable, Functor)
 
 
-copySItoDI :: (MonadSiteIO si di t m, DepRecordMonad m si di)
-  => si -> di -> m ()
-copySItoDI si di = recordSI si >> copySItoDI_ si di
+--
+class ( Member (SiteIO si di t) r
+      , Ord si, Ord di, Ord t, Typeable  si, Typeable di, Typeable t)
+      => HasSiteIO si di t r | r -> si di t
 
-readString :: (DepRecordMonad m si di, MonadSiteIO si di t m) 
-  => si -> m String
+instance (Ord si, Ord di, Ord t, Typeable  si, Typeable di, Typeable t)
+         => HasSiteIO si di t (SiteIO si di t :> r)
+
+instance ( HasSiteIO si di t r
+         , Ord si, Ord di, Ord t, Typeable  si, Typeable di, Typeable t)
+         => HasSiteIO si di t (a :> r)      
+
+--
+openSI
+  :: forall si di t r
+  .  (HasSiteIO si di t r)
+  => si -> Eff r Handle
+openSI si = send $ \ f -> inj (t f)
+  where
+    t :: (Handle -> a) -> SiteIO si di t a
+    t f = OpenSI si f
+
+openDI
+  :: forall si di t r
+  .  (HasSiteIO si di t r)
+  => di -> Eff r Handle
+openDI di = send $ \ f -> inj (t f)
+  where
+    t :: (Handle -> a) -> SiteIO si di t a
+    t f = OpenDI di f
+
+doesExistSI
+  :: forall si di t r
+  .  (HasSiteIO si di t r)
+  => si -> Eff r Bool
+doesExistSI si = send $ \ f -> inj (t f)
+  where
+    t :: (Bool -> a) -> SiteIO si di t a
+    t f = DoesExistSI si f
+
+copySIToDI
+  :: forall si di t r
+  .  (HasSiteIO si di t r, HasDepRecord si di r)
+  => si -> di -> Eff r ()
+copySIToDI si di = (send $ \ f -> inj (t f)) >> recordSI si
+  where
+    t :: (() -> a) -> SiteIO si di t a
+    t f = CopySIToDI si di f
+
+checkTime
+  :: forall si di t r
+  .  (HasSiteIO si di t r)
+  => si -> Eff r t
+checkTime si = send $ \ f -> inj (t f)
+  where
+    t :: (t -> a) -> SiteIO si di t a
+    t f = CheckTime si f
+
+curTime
+  :: forall si di t r
+  .  (HasSiteIO si di t r)
+  => Eff r t
+curTime = send $ \ f -> inj (t f)
+  where
+    t :: (t -> a) -> SiteIO si di t a
+    t f = CurTime f    
+--
+readString :: (HasDepRecord si di r, HasSiteIO si di t r, MonadIO (Eff r))
+  => si -> Eff r String
 readString si = do
   recordSI si
   openSI si >>= liftIO . hGetContents
 
-readByteString :: (DepRecordMonad m si di, MonadSiteIO si di t m) 
-  => si -> m BS.ByteString
+readByteString :: (HasDepRecord si di r, HasSiteIO si di t r, MonadIO (Eff r))
+  => si -> Eff r BS.ByteString
 readByteString si = do
   recordSI si
   openSI si >>= liftIO . BS.hGetContents
 
-readByteStringL :: (DepRecordMonad m si di, MonadSiteIO si di t m) 
-  => si -> m LBS.ByteString
+readByteStringL :: (HasDepRecord si di r, HasSiteIO si di t r, MonadIO (Eff r))
+  => si -> Eff r LBS.ByteString
 readByteStringL si = do
   recordSI si
   openSI si >>= liftIO . LBS.hGetContents
 
-writeString :: (DepRecordMonad m si di, MonadSiteIO si di t m)
-  => di -> String -> m ()
+writeString :: (HasDepRecord si di r, HasSiteIO si di t r, MonadIO (Eff r))
+  => di -> String -> Eff r ()
 writeString di str = do
   openDI di >>= liftIO . flip hPutStr str
 
-writeByteString :: (DepRecordMonad m si di, MonadSiteIO si di t m) 
-  => di -> BS.ByteString -> m ()
+writeByteString :: (HasDepRecord si di r, HasSiteIO si di t r, MonadIO (Eff r))
+  => di -> BS.ByteString -> Eff r ()
 writeByteString di str = do
   openDI di >>= liftIO . flip BS.hPutStr str
 
-writeByteStringL :: (DepRecordMonad m si di, MonadSiteIO si di t m) 
-  => di -> LBS.ByteString -> m ()
+writeByteStringL :: (HasDepRecord si di r, HasSiteIO si di t r, MonadIO (Eff r))
+  => di -> LBS.ByteString -> Eff r ()
 writeByteStringL di str = do
   openDI di >>= liftIO . flip LBS.hPutStr str
 
 
-newtype MemoTime si t m a = MemoTime (StateT (M.Map si t) m a)
-  deriving (Monad, MonadIO, Functor, Applicative, MonadTrans)
+--
 
-instance (Ord si, MonadSiteIO si di t m)
-  => MonadSiteIO si di t (MemoTime si t m) where
-  openSI = lift . openSI
-  openDI = lift . openDI
-  doesExistSI = lift . doesExistSI
-  copySItoDI_ si di = lift $ copySItoDI_ si di
-  curTime = lift curTime
-  checkTime si = MemoTime $ do
-    x <- get 
-    case M.lookup si x of
-      Just t -> return t
-      Nothing -> do
-        t <- lift $ checkTime si
-        modify $ M.insert si t
-        return t
-
-
-safeCheckTime :: (MonadSiteIO si di t m) => si -> m (Maybe t)
+safeCheckTime :: HasSiteIO si di t r => si -> Eff r (Maybe t)
 safeCheckTime si = do
   c <- doesExistSI si
   case c of
     True -> Just `liftM` checkTime si
     False -> return Nothing
 
-
-runMemoTime :: (MonadIO m, Ord si) => MemoTime si t m a -> m a
-runMemoTime (MemoTime m) = evalStateT m M.empty
-
-
 -- | True == changed
-checkForChanges:: (MonadSiteIO si di t m, Ord t) => t -> S.Set si -> m Bool
+checkForChanges :: HasSiteIO si di t r => t -> S.Set si -> Eff r Bool
 checkForChanges t ss = do
   go $ S.toList ss
   where 
@@ -139,3 +160,21 @@ checkForChanges t ss = do
       case st of
         Just a | a <= t -> go xs
         _ -> return True
+
+
+-- checkme
+runMemoTrie
+  :: forall si di t r a
+  .  (HasSiteIO si di t r)
+  => Eff r a -> Eff r a
+runMemoTrie m = loop M.empty $ admin m
+  where
+    loop !m (Val x) = return x
+    loop !m (E u)   = interpose u (loop m) f
+      where
+        f :: SiteIO si di t (VE r a) -> Eff r a
+        f (CheckTime si k) = case M.lookup si m of
+          Just t  -> loop m $ k t
+          Nothing -> do
+            t <- checkTime si
+            loop (M.insert si t m) $ k t

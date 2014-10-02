@@ -1,4 +1,4 @@
-{-# LANGUAGE ExistentialQuantification, MultiParamTypeClasses
+{-# LANGUAGE ExistentialQuantification, MultiParamTypeClasses, BangPatterns
   , FunctionalDependencies, FlexibleInstances, TypeFamilies, UndecidableInstances
   , GeneralizedNewtypeDeriving, TemplateHaskell, FlexibleContexts
   , DeriveDataTypeable, ScopedTypeVariables, TypeOperators
@@ -32,8 +32,8 @@ runDepRecord :: (Typeable di, Typeable si, Ord di, Ord si)
   => Eff (DepRecord si di :> r) a -> Eff r ((S.Set si, S.Set di), a)
 runDepRecord m = loop (S.empty, S.empty) $ admin m
   where
-    loop st@(ss, ds) (Val x) = return (st, x)
-    loop st@(ss, ds) (E u)   = handleRelay u (loop st) f
+    loop st@(!ss, !ds) (Val x) = return (st, x)
+    loop st@(!ss, !ds) (E u)   = handleRelay u (loop st) f
       where
         f (DepRecord i k)
           | Left  si <- i = loop (si `S.insert` ss, ds) k
