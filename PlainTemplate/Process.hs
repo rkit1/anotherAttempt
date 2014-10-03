@@ -1,15 +1,10 @@
 {-# LANGUAGE RecordWildCards, FlexibleContexts #-}
 module PlainTemplate.Process where
 
-import PlainTemplate.Variable
 import PlainTemplate.Parser
 import PlainTemplate.Monad
 import Library
 import Library.System
-import Data.Accessor.Monad.MTL.State ((%=),(%:))
-import qualified Data.Accessor.Monad.MTL.State as A
-import Control.Monad.State.Class
-import Control.Monad.Error.Class
 import qualified Data.Map as M
 import qualified Data.Set as S
 import System.Process
@@ -17,29 +12,27 @@ import System.FilePath
 import qualified Text.Parsec as P
 import SiteGen.Main
 import Data.String
+import Control.Eff
 
-callRTPL :: (PTLMonad si di t m) => si -> m String
 callRTPL path = do
   readRTPLE utf8 path >>= processTemplate
 
 
-readRTPL :: (PTLMonad si di t m) => si -> m Body
 readRTPL path = do
   f <- readString path
   throwError . show <++> return 
     $ runP body () (show path) f
 
-readRTPLE :: (PTLMonad si di t m)
-             => TextEncoding -> si -> m Body
+readRTPLE :: HasPTL si di t r => TextEncoding -> si -> Eff r Body
 readRTPLE enc path = do
   f <- readString $ path
   throwError . show <++> return 
     $ runP body () (show path) f
 
-parseRTPL :: (MonadError String m) => String -> m Body
+parseRTPL :: HasPTL si di t r => String -> Eff r Body
 parseRTPL str = throwError . show <++> return  $ runP body () "no file" str
 
-processTemplate :: PTLMonad si di t m => Body -> m String
+processTemplate :: HasPTL si di t r => Body -> Eff r String
 processTemplate = wide $ return <++> p
   where 
     p = setVarTag ( \ a b -> setVar a b >> return [] )
@@ -52,7 +45,7 @@ processTemplate = wide $ return <++> p
 
 wide m l = liftM concat $ mapM m l
 
-processSet :: PTLMonad si di t m => [Either String Tag] -> m [Dictionary]
+processSet :: HasPTL si di t r => [Either String Tag] -> Eff r [Dictionary]
 processSet x = wide (none <++> p) x
   where
     item b = do
@@ -61,24 +54,25 @@ processSet x = wide (none <++> p) x
     p = setVarTag ( \ a b -> setVar a b >> return [] )
       $ stepDown
       $ includeTag processSet 
-      $ listingTag processSet
       $ programTag (parseRTPL >=> processSet)
       $ itemTag item
       $ unexpectedTag
 
-processVariableSet :: PTLMonad si di t m => Body -> m [(String,Variable)]
+
+processVariableSet :: HasPTL si di t r => Body -> Eff r [(String,Variable)]
 processVariableSet x = wide (none <++> p) x
   where
     p = setVarTag (\ a b -> return [(a,b)]) $ stepDown unexpectedTag
 
-none :: PTLMonad si di t m => a -> m [b]
+none :: HasPTL si di t r => a -> Eff r [b]
 none = const $ return []
 
-unexpectedTag :: PTLMonad si di t m => Tag -> m a
+unexpectedTag :: HasPTL si di t r => Tag -> Eff r a
 unexpectedTag (Tag pos name attrs body) = throwError $ "unexpected tag " ++ name
 
-foreachTag :: PTLMonad si di t m
-              => (Body -> Dictionary -> m [a]) -> (Tag -> m [a]) -> Tag -> m [a]
+
+foreachTag :: HasPTL si di t r
+  => (Body -> Dictionary -> Eff r [a]) -> (Tag -> Eff r [a]) -> Tag -> Eff r [a]
 foreachTag success cont (Tag pos "foreach" attrs body) = do
   let (var:c) = attrs
       count = case c of
@@ -89,18 +83,19 @@ foreachTag success cont (Tag pos "foreach" attrs body) = do
   wide (success body) $ take count set
 foreachTag _ cont t = cont t
 
-variableTag :: PTLMonad si di t m => (Variable -> m a) -> (Tag -> m a) -> Tag -> m a
+
+variableTag :: HasPTL si di t r
+  => (Variable -> Eff r a) -> (Tag -> Eff r a) -> Tag -> Eff r a
 variableTag success cont (Tag pos "variable" attrs body) = do
   v <- lookupVar $ head attrs
   success v
 variableTag _ cont t = cont t
 
-
-itemTag :: PTLMonad si di t m => (Body -> m a) -> (Tag -> m a) -> Tag -> m a
+itemTag :: HasPTL si di t r => (Body -> Eff r a) -> (Tag -> Eff r a) -> Tag -> Eff r a
 itemTag success cont (Tag pos "item" attrs body) = success body
 itemTag _ cont t = cont t
 
-includeTag :: PTLMonad si di t m => (Body -> m a) -> (Tag -> m a) -> Tag -> m a
+includeTag :: HasPTL si di t r => (Body -> Eff r a) -> (Tag -> Eff r a) -> Tag -> Eff r a
 includeTag success cont (Tag pos "include" attrs body) = do
   b <- processTemplate body
   let b' = fromString b
@@ -109,8 +104,8 @@ includeTag success cont (Tag pos "include" attrs body) = do
   success $ sv:t
 includeTag _ cont t = cont t
 
-setVarTag :: PTLMonad si di t m
-             => (String -> Variable -> m a) -> (Tag -> m a) -> Tag -> m a
+setVarTag :: HasPTL si di t r
+  => (String -> Variable -> Eff r a) -> (Tag -> Eff r a) -> Tag -> Eff r a
 setVarTag success cont (Tag pos "setVar" attrs body) = do
   let (varName:type') = attrs
   b <- case type' of
@@ -119,23 +114,7 @@ setVarTag success cont (Tag pos "setVar" attrs body) = do
   success varName b
 setVarTag _ cont t = cont t
 
-
-listingTag :: PTLMonad si di t m => (Body -> m a) -> (Tag -> m a) -> Tag -> m a
-listingTag success cont (Tag pos "listing" attrs body) = do
-  x <- processTemplate body
-  z <- wide g $ lines x
-  success z
-  where 
-    g fp = do
-      
-      c <- liftIO $ doesFileExist $ "x:/" ++ fp ++ "/~phead.htm"
-      parseRTPL $ if c 
-        then printf "[item|[setVar:head|[include|%s/~phead.htm]]]" fp
-        else error "FIXME: Process.hs 130"
-   -- printf "[item|[setVar:head|[phpInclude|%s]]]" fp
-listingTag _ cont t = cont t
-
-programTag :: PTLMonad si di t m => (String -> m a) -> (Tag -> m a) -> Tag -> m a
+programTag :: HasPTL si di t r => (String -> Eff r a) -> (Tag -> Eff r a) -> Tag -> Eff r a
 programTag success cont (Tag pos "program" (name:args) body) = do
   x <- processTemplate body
   let cp = (proc name args) 
@@ -149,8 +128,7 @@ programTag success cont (Tag pos "program" (name:args) body) = do
   success r
 programTag _ cont t = cont t
 
-
-imagesTag :: PTLMonad si di t m => (String -> m a) -> (Tag -> m a) -> Tag -> m a
+imagesTag :: HasPTL si di t r => (String -> Eff r a) -> (Tag -> Eff r a) -> Tag -> Eff r a
 imagesTag success cont t@(Tag pos "images" attrs body) = do
   b <- processTemplate body
   let Right r = P.parse parser "" $ concat $ words b
@@ -170,11 +148,11 @@ imagesTag success cont t@(Tag pos "images" attrs body) = do
     di = liftM read $ P.many1 P.digit 
 imagesTag _ cont t = cont t
 
-stepDown :: PTLMonad si di t m => (Tag -> m a) -> Tag -> m a
+stepDown :: HasPTL si di t r => (Tag -> Eff r a) -> Tag -> Eff r a
 stepDown proc t@(Tag pos' name attrs body) = do
-  stack %: \ l@(StackElem{..}:xs) -> StackElem{tag__ = t,..}:l
+  sStack %: \ l@(StackElem{..}:xs) -> StackElem{seTag__ = t,..}:l
   x <- proc t
-  stack %: tail
+  sStack %: tail
   return x
 
 {-

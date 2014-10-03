@@ -1,5 +1,5 @@
-{-# LANGUAGE FlexibleContexts, OverloadedStrings, TemplateHaskell
-  , RecordWildCards #-}
+{-# LANGUAGE FlexibleContexts, OverloadedStrings, TemplateHaskell, TypeOperators
+  , RecordWildCards, ScopedTypeVariables #-}
 module ClubviRu.Pages.Mainpage where
 import ClubviRu.Config.Parser (parseConfigFile)
 --import Path.Destination
@@ -19,23 +19,24 @@ import qualified Data.Set as S
 import ClubviRu.Date
 import PlainTemplate.Monad
 import PlainTemplate.Process
-import PlainTemplate.Variable
 import SiteGen.IO as IO
 import ClubviRu.Config.Parser
 import ClubviRu.Config.Site
 import Text.Printf
+import Control.Eff
+import Control.Eff.Lift
+import Control.Eff.State.Strict
+import Control.Eff.Exception
 
-
-
-(!) :: Monad m => M.Map String a -> String -> m a
+--(!) :: Monad m => M.Map String a -> String -> m a
 a ! b = case M.lookup b a of Nothing -> $terror ("key not found: " ++ b)
                              Just a -> return $! a
 
 
 runMainPage ::
-  ( DepRecordMonad m SP DP
-  , SiteConfig m, MonadSiteIO SP DP t m)
-  => Maybe Date -> SP -> m String
+  ( HasDepRecord SP DP r, HasSiteConfig r, HasSiteIO SP DP t r
+  , SetMember Lift (Lift m) r, MonadIO m, Typeable m) =>
+  Maybe Date -> SP -> Eff r String
 runMainPage pageDate mpFile = do
   Right cfg <- readConfig mpFile
 
@@ -61,17 +62,18 @@ runMainPage pageDate mpFile = do
                       | pageDate == Nothing ]
       archiveMainLink = archiveLinkString (archiveLink $ head months) "Архив"
 
-  let right
-        | Nothing <- pageDate = processColumn =<< cfg ! "right"
-        | Just d <- pageDate = do
-            "head" $= ("Архив" :: String)
-            "body" $= concat
-              [ archiveLinkString (archiveLink m) (showDate m)
-              | m <- months ]
-            callRTPL "/~templates/widget.rtpl"
 
-  
-  runMAndRecordSI $ do
+  runPTLE $ do
+    let
+      right
+        | Nothing <- pageDate = cfg ! "right" >>= processColumn
+        | Just d <- pageDate = do
+          "head" $= ("Архив" :: String)
+          "body" $= concat
+            [ archiveLinkString (archiveLink m) (showDate m)
+            | m <- months ]
+          callRTPL "/~templates/widget.rtpl"
+
     "title" $=. cfg ! "title"
     "leftcolumn" $=. processColumn =<< cfg ! "left"
     "rightcolumn" $=. right
@@ -80,9 +82,9 @@ runMainPage pageDate mpFile = do
 
 
 runMainPageListing ::
-  ( DepRecordMonad m SP DP
-  , MonadSiteIO SP DP t m)
-  => SP -> m String
+  ( HasDepRecord SP DP r, HasSiteIO SP DP t r
+  , SetMember Lift (Lift m) r, MonadIO m, Typeable m) 
+  => SP -> Eff r String
 runMainPageListing mplFile = do
   Right cfg <- readConfig mplFile
 
@@ -98,7 +100,7 @@ runMainPageListing mplFile = do
                   title :: String
     return $ mkDictionary [ ("content", Variable linkStr ) ]
 
-  runMAndRecordSI $ do
+  runPTLE $ do
     "title" $=. cfg ! "title"
     "leftcolumn" $=. processColumn =<< cfg ! "left"
     "rightcolumn" $=. processColumn =<< cfg ! "right"
@@ -107,20 +109,7 @@ runMainPageListing mplFile = do
   
 
 
-runMAndRecordSI :: (MonadIO m, DepRecordMonad m SourcePath di) => M m a -> m a
-runMAndRecordSI m = do
-  res <- runM $ do
-    a <- m
-    deps <- A.get depends
-    return (a, deps)
-  case res of
-    Right (a, deps) -> do
-      forM_ (S.toList deps) $ recordSI . fromString
-      return a
-    Left err -> $terror (show err)
-
-
-processColumn :: PTLMonad SP DP t m => String -> m String
+processColumn :: (HasPTL SP DP t r) => String -> Eff r String
 processColumn str = 
   let list = filter (not . all isSpace) $ lines str
   in liftM concat $ forM list $ \ item -> 

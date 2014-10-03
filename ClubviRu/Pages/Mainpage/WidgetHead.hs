@@ -17,15 +17,16 @@ import SiteGen.Main
 import ClubviRu.Resource
 import qualified Data.Map as M
 import Data.Knob
-import Control.Monad.Error
+import Control.Eff
+import Control.Eff.Exception
 
 readWidgetHead
-  :: (DepRecordMonad m SP DP, MonadSiteIO SP DP t m, MonadError String m)
-  => SP -> m String
+  :: (HasDepRecord SP DP r, HasSiteIO SP DP t r)
+  => SP -> Eff r String
 readWidgetHead path@Resource{..} = do
-  c <- doesExistSI path
-  unless c $ throwError
-    $ printf "readWidgetHead: %s does not exist" (toFilePath "" path)
+--  c <- doesExistSI path
+--  unless c $ throwExc 
+--    $ (printf "readWidgetHead: %s does not exist" (toFilePath "" path) :: String)
   s <- readByteString path
   (_,nodes) <- case parseXML (show path) s of
    Left x -> $terror x

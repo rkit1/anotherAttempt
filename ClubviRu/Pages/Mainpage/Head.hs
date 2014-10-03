@@ -17,8 +17,9 @@ import ClubviRu.Resource
 import SiteGen.Main
 import Data.Knob
 import Library
+import Control.Eff
 
-readHead :: (DepRecordMonad m SP di, MonadSiteIO SP di t m) => SP -> m String
+readHead :: (HasDepRecord SP di r, HasSiteIO SP di t r) => SP -> Eff r String
 readHead src = do
   let path = pathToString src
   s <- IO.readByteString src
@@ -36,8 +37,8 @@ readHead src = do
     last out `seq` hClose h
     return out
 
-readHeadU :: (DepRecordMonad m SP di, MonadSiteIO SP di t m)
-  => SP -> m String
+readHeadU :: (HasDepRecord SP di r, HasSiteIO SP di t r) 
+  => SP -> Eff r String
 readHeadU src = do
   let head = "~head.htm.src" `relativeTo` src
       headL = "~head.htm" `relativeTo` src
