@@ -1,6 +1,6 @@
 {-# LANGUAGE RecordWildCards, GeneralizedNewtypeDeriving, FlexibleInstances
   , MultiParamTypeClasses, UndecidableInstances, OverloadedStrings, TypeFamilies
-  , TemplateHaskell #-}
+  , TemplateHaskell, TypeOperators, FlexibleContexts #-}
 module ClubviRu.Monad where
 import ClubviRu.Config.Site
 import Network.URI
@@ -17,60 +17,59 @@ import Control.Monad.Trans.Control
 import Control.Monad
 import Data.Time
 import Control.Monad.Trans.Control
+import Control.Eff
+import Control.Eff.Lift
+import Control.Eff.Reader.Strict
+import Data.Typeable
 
-newtype ClubviRuMonad m a = ClubviRuMonad {runClubviRu :: m a} 
-  deriving (Monad, MonadIO, Functor, Applicative)
 
-instance MonadTrans ClubviRuMonad where
-  lift = ClubviRuMonad
+runClubviRu :: (SetMember Lift (Lift m) r, MonadIO m, Typeable m) =>
+     Eff (SiteIO SP DP UTCTime :> Reader SiteConfig :> r) w -> Eff r w
+runClubviRu m = runReader (loop $ admin m) config
+  where
+    loop (Val x) = return x
+    loop (E u)   = handleRelay u loop f
+      where
+        f (OpenDI di@Resource{..} k) = do
+          fp <- toFilePathM (di :: DP)
+          dp <- toDirectoryPathM di
+          h <- liftIO $ do
+            createDirectoryIfMissing True dp
+            h <- openFile fp WriteMode
+            hSetEncoding h utf8
+            return h
+          loop $ k h
+        f (OpenSI si k) = do
+          fp <- toFilePathM (si :: SP)
+          h <- liftIO $ do
+            h <- openFile fp ReadMode
+            hSetEncoding h utf8
+            return h
+          loop $ k h
+        f (DoesExistSI si k) = do
+          fp <- toFilePathM si
+          res <- liftIO $ doesFileExist fp
+          loop $ k res
+        f (CopySIToDI si di k) = do
+          fps <- toFilePathM si
+          fpd <- toFilePathM di
+          res <- liftIO $ do
+            createDirectoryIfMissing True $ takeDirectory fpd
+            copyFile fps fpd
+          loop $ k res
+        f (CheckTime si k) = do
+          fp <- toFilePathM si
+          res <- liftIO $ getModificationTime fp
+          loop $ k res
+        f (CurTime k) = liftIO getCurrentTime >>= loop . k
 
-instance (Functor m, Monad m, MonadBase b m)
-  => MonadBase b (ClubviRuMonad m) where
-  liftBase = liftBaseDefault 
 
-instance MonadBaseControl b m => MonadBaseControl b (ClubviRuMonad m) where
-  newtype StM (ClubviRuMonad m) a =
-    StMClubvi {unStMClubvi :: ComposeSt ClubviRuMonad m a}
-  liftBaseWith = defaultLiftBaseWith StMClubvi
-  restoreM     = defaultRestoreM   unStMClubvi
 
-instance MonadTransControl ClubviRuMonad where
-  newtype StT ClubviRuMonad a = StClubvi {unStClubvi :: a}
-  liftWith f = ClubviRuMonad $ f $ liftM StClubvi . runClubviRu
-  restoreT = ClubviRuMonad . liftM unStClubvi
-
-instance (MonadIO m) => 
-  MonadSiteIO SourcePath DestinationPath UTCTime (ClubviRuMonad m) where
-    openDI di@Resource{..} = do
-      fp <- toFilePathM di
-      dp <- toDirectoryPathM di
-      liftIO $ do
-        createDirectoryIfMissing True dp
-        h <- openFile fp WriteMode
-        hSetEncoding h utf8
-        return h
-    openSI si = toFilePathM si >>= \ fp -> liftIO $ do
-      h <- openFile fp ReadMode
-      hSetEncoding h utf8
-      return h
-    doesExistSI si = toFilePathM si >>= \ fp -> liftIO $ doesFileExist fp
-    copySItoDI_ si di = do
-      fps <- toFilePathM si
-      fpd <- toFilePathM di
-      liftIO $ do
-        createDirectoryIfMissing True $ takeDirectory fpd
-        copyFile fps fpd
-    checkTime si = toFilePathM si >>= \ fp -> liftIO $ getModificationTime fp
-    curTime = liftIO $ getCurrentTime 
-
-instance Monad m => SiteConfig (ClubviRuMonad m) where
-  sourceRoot = 
-    return "c:/Users/Victor/Documents/wrk/newsite/anotherAttemptSource/"
-  destinationRoot = 
-    return "c:/Users/Victor/Documents/wrk/newsite/anotherAttemptDestination/"
-  storeRoot = 
-    return "c:/Users/Victor/Documents/wrk/newsite/anotherAttemptStore/"
-  myDomains = return ["clubvi.ru", "www.clubvi.ru"]
-
-$(deriveDepDBMonad $ \ si di t -> [t|ClubviRuMonad|])
-$(deriveDepRecordMonad $ \ si di -> [t|ClubviRuMonad|])
+config :: SiteConfig
+config = SiteConfig
+  { sourceRoot_ = root ++ "/anotherAttemptSource/"
+  , destionationRoot_ = root ++ "/anotherAttemptDestination/"
+  , storeRoot_ = root ++ "/anotherAttemptStore/"
+  , myDomains_ = ["clubvi.ru", "www.clubvi.ru"] }
+  where
+    root = "c:/Users/Victor/Documents/wrk/newsite/"

@@ -10,9 +10,6 @@ import ClubviRu.DepFile
 import ClubviRu.Date
 import System.Directory
 import Control.Monad.Trans
-import Control.Monad.Cont
-import Control.Monad.State
-import Control.Monad.Error
 import SiteGen.Main
 import qualified Data.ByteString.Lazy as LBS
 import qualified Data.Text as T
@@ -23,13 +20,13 @@ import SiteGen.LinkExtractor
 import Control.Applicative
 import Data.Time
 import Control.Exception.Lifted
-import Control.Monad.Trans.Control 
+import Control.Eff
+import Control.Eff.State.Strict
+import Control.Eff.Exception
+import Control.Eff.Lift
 
+{-
 ----
-newtype PathHandler m a =
-  PH { runPH :: ErrorT String (StateT (Resource Destination) m) a }
-    deriving (Functor, Applicative, Alternative, Monad
-             , MonadPlus, MonadIO, MonadError String)
 
 runPathHandler
   :: forall m a. MonadBaseControl IO m
@@ -40,50 +37,34 @@ runPathHandler input (PH a) = catch work handler
     handler :: SomeException -> m (Either String a)
     handler e = return $ Left $ "runPathHandler: " ++ toFilePath "" input ++ ": " ++ show e
 
+-}
 
-instance Monad m => MonadState DP (PathHandler m) where
-  get = PH get
-  put s = PH $ put s
-  
-instance MonadTrans PathHandler where
-  lift m = PH $ lift $ lift m
-
-class
-  ( DepRecordMonad m SP DP
-  , SiteConfig m
-  , MonadSiteIO SP DP UTCTime m
-  , MonadPlus m
-  , MonadState DP m
-  , MonadError String m)
-  => PathHandlerM m
-
-instance
-  ( DepRecordMonad m SP DP
-  , SiteConfig m
-  , MonadSiteIO SP DP UTCTime m )
-  => PathHandlerM (PathHandler m)
+class ( Member (State DP) r, MonadPlus (Eff r), Member (Exc String) r
+      , HasSiteIO SP DP UTCTime r, HasDepRecord SP DP r, HasSiteConfig r)
+      => HasPathHandler r
+--instance (Member (State DP) r, MonadPlus (Eff r), Member (Exc String) r)
+--         => HasPathHandler r
 
 
 ----
-clubviRoute :: (PathHandlerM m) => m ()
+clubviRoute :: (HasPathHandler r, Typeable m, SetMember Lift (Lift m) r, MonadIO m) => Eff r ()
 clubviRoute = msum
   [ exactFile
   , archive
   , mainPage
   , mainPageListing
   , apps
-  ] `mplus` unhandled
-  where
-    unhandled = do
-      d <- get
-      throwError $ printf "unhandled desination: %s" (toFilePath "" d)
+  ] `mplus` do
+    d :: DP <- get
+    throwExc $
+      (printf "unhandled desination: %s" (toFilePath "" d) :: String)
 
-apps :: (PathHandlerM m) => m ()
+apps :: HasPathHandler r => Eff r ()
 apps = do
-  Resource{resPath = "apps":_} <- get
+  Resource{resPath = "apps":_} :: DP <- get
   return ()
 
-mainPage :: (PathHandlerM m) => m ()
+mainPage :: (HasPathHandler r, Typeable m, SetMember Lift (Lift m) r, MonadIO m) => Eff r ()
 mainPage = do
   d@Resource{..} <- get
   let s = Resource{resName = resName `changeExtT` "mp", .. }
@@ -94,7 +75,7 @@ mainPage = do
   depFile
 
 
-mainPageListing :: (PathHandlerM m) => m ()
+mainPageListing :: (HasPathHandler r, Typeable m, SetMember Lift (Lift m) r, MonadIO m) => Eff r ()
 mainPageListing = do
   d@Resource{..} <- get
   let s = Resource{resName = resName `changeExtT` "mpl", .. }
@@ -105,7 +86,7 @@ mainPageListing = do
   depFile
 
 
-archive :: PathHandlerM m => m ()
+archive :: (HasPathHandler r, Typeable m, SetMember Lift (Lift m) r, MonadIO m) => Eff r ()
 archive = do
   d@Resource{resPath = ("archive":path), ..} <- get
   let s = Resource{resName = last path `changeExtT` "mp", resPath = init path, ..}
@@ -115,7 +96,7 @@ archive = do
   recordHtmlLinks str d
   writeString d str
 
-exactFile :: (PathHandlerM m) => m ()
+exactFile :: HasPathHandler r => Eff r ()
 exactFile = do
   d@Resource{..} <- get
   let s = Resource{..}
@@ -125,7 +106,7 @@ exactFile = do
     , copySItoDI s d ]
   depFile
   
-depFile :: (PathHandlerM m) => m ()
+depFile :: HasPathHandler r => Eff r ()
 depFile = do
   d@Resource{..} <- get
   let s = Resource{..}
@@ -139,7 +120,7 @@ depFile = do
 
 
 
-copyHtmlAndRecord :: (PathHandlerM m) => SP -> DP -> m ()
+copyHtmlAndRecord :: HasPathHandler r => SP -> DP -> Eff r ()
 copyHtmlAndRecord s d = do
   guard $ getExt d == "htm"
   str <- readString s
@@ -148,12 +129,7 @@ copyHtmlAndRecord s d = do
     
 
 
-recordHtmlLinks :: (PathHandlerM m) => String -> DP -> m ()
+recordHtmlLinks :: HasPathHandler r => String -> DP -> Eff r ()
 recordHtmlLinks str dp = do
   links <- filterLinks $ extractLinkStrings str
   forM_ links $ \ l -> recordDI $ fromString l `relativeTo` dp
-
-$(deriveMonadSiteIO $ \ si di t -> [t|PathHandler|])
-$(deriveDepRecordMonad $ \ si di -> [t|PathHandler|])
-$(deriveSiteConfig [t|PathHandler|])
-

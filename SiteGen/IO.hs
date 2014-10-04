@@ -28,7 +28,7 @@ data SiteIO si di t a
   | DoesExistSI
     { si :: si
     , result3 :: Bool -> a }
-  | CopySIToDI
+  | CopySItoDI
     { si :: si
     , di :: di
     , result4 :: () -> a }
@@ -83,14 +83,14 @@ doesExistSI si = send $ \ f -> inj (t f)
     t :: (Bool -> a) -> SiteIO si di t a
     t f = DoesExistSI si f
 
-copySIToDI
+copySItoDI
   :: forall si di t r
   .  (HasSiteIO si di t r, HasDepRecord si di r)
   => si -> di -> Eff r ()
-copySIToDI si di = (send $ \ f -> inj (t f)) >> recordSI si
+copySItoDI si di = (send $ \ f -> inj (t f)) >> recordSI si
   where
     t :: (() -> a) -> SiteIO si di t a
-    t f = CopySIToDI si di f
+    t f = CopySItoDI si di f
 
 checkTime
   :: forall si di t r
