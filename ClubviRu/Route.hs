@@ -1,6 +1,7 @@
 {-# LANGUAGE TemplateHaskell, OverloadedStrings, GeneralizedNewtypeDeriving,
   RecordWildCards, FlexibleInstances, MultiParamTypeClasses, UndecidableInstances,
-  NoMonomorphismRestriction, FlexibleContexts, ScopedTypeVariables  #-}
+  NoMonomorphismRestriction, FlexibleContexts, ScopedTypeVariables, TypeOperators
+  #-}
 module ClubviRu.Route where
 import ClubviRu.Config.Site
 import ClubviRu.Resource
@@ -21,29 +22,35 @@ import Control.Applicative
 import Data.Time
 import Control.Exception.Lifted
 import Control.Eff
-import Control.Eff.State.Strict
+import Control.Eff.Eplus
+import Control.Eff.Reader.Strict
 import Control.Eff.Exception
 import Control.Eff.Lift
+import Control.Monad.Trans.Control
 
-{-
 ----
 
-runPathHandler
-  :: forall m a. MonadBaseControl IO m
-  => DP -> PathHandler m a -> m (Either String a)
-runPathHandler input (PH a) = catch work handler
-  where
-    work = evalStateT (runErrorT a) input
-    handler :: SomeException -> m (Either String a)
-    handler e = return $ Left $ "runPathHandler: " ++ toFilePath "" input ++ ": " ++ show e
 
+runPathHandler :: DP ->
+  Eff (Eplus (Member (Exc String)) :> Exc String :> (Reader DP :> r)) a ->
+  Eff r (Either String a)
+runPathHandler input m = runReader (runExc $ runEplusExc "ezero" m) input
+{-
+                         catch work handler
+  where
+    work = 
+    handler :: Monad m => SomeException -> m (Either String a)
+    handler e = return $ Left $ printf
+                "runPathHandler: %s: %s" (toFilePath "" input) (show e)
 -}
 
-class ( Member (State DP) r, MonadPlus (Eff r), Member (Exc String) r
+
+class ( Member (Reader DP) r, MonadPlus (Eff r), Member (Exc String) r
       , HasSiteIO SP DP UTCTime r, HasDepRecord SP DP r, HasSiteConfig r)
       => HasPathHandler r
---instance (Member (State DP) r, MonadPlus (Eff r), Member (Exc String) r)
---         => HasPathHandler r
+instance ( Member (Reader DP) r, MonadPlus (Eff r), Member (Exc String) r
+      , HasSiteIO SP DP UTCTime r, HasDepRecord SP DP r, HasSiteConfig r)
+      => HasPathHandler r
 
 
 ----
@@ -55,18 +62,18 @@ clubviRoute = msum
   , mainPageListing
   , apps
   ] `mplus` do
-    d :: DP <- get
+    d :: DP <- ask
     throwExc $
       (printf "unhandled desination: %s" (toFilePath "" d) :: String)
 
 apps :: HasPathHandler r => Eff r ()
 apps = do
-  Resource{resPath = "apps":_} :: DP <- get
+  Resource{resPath = "apps":_} :: DP <- ask
   return ()
 
 mainPage :: (HasPathHandler r, Typeable m, SetMember Lift (Lift m) r, MonadIO m) => Eff r ()
 mainPage = do
-  d@Resource{..} <- get
+  d@Resource{..} <- ask
   let s = Resource{resName = resName `changeExtT` "mp", .. }
   doesExistSI s >>= guard
   str <- runMainPage Nothing s
@@ -77,7 +84,7 @@ mainPage = do
 
 mainPageListing :: (HasPathHandler r, Typeable m, SetMember Lift (Lift m) r, MonadIO m) => Eff r ()
 mainPageListing = do
-  d@Resource{..} <- get
+  d@Resource{..} <- ask
   let s = Resource{resName = resName `changeExtT` "mpl", .. }
   doesExistSI s >>= guard
   str <- runMainPageListing s
@@ -87,18 +94,21 @@ mainPageListing = do
 
 
 archive :: (HasPathHandler r, Typeable m, SetMember Lift (Lift m) r, MonadIO m) => Eff r ()
-archive = do
-  d@Resource{resPath = ("archive":path), ..} <- get
-  let s = Resource{resName = last path `changeExtT` "mp", resPath = init path, ..}
-  doesExistSI s >>= guard
-  date <- readDate $ T.unpack resName
-  str <- runMainPage (Just date) s
-  recordHtmlLinks str d
-  writeString d str
+archive = ask >>= \ d ->
+  case d of
+    Resource{resPath = ("archive":path), ..} -> do
+      let s = Resource{ resName = last path `changeExtT` "mp"
+                      , resPath = init path, ..}
+      doesExistSI s >>= guard
+      date <- readDate $ T.unpack resName
+      str <- runMainPage (Just date) s
+      recordHtmlLinks str d
+      writeString d str
+    _ -> mzero
 
 exactFile :: HasPathHandler r => Eff r ()
 exactFile = do
-  d@Resource{..} <- get
+  d@Resource{..} <- ask
   let s = Resource{..}
   doesExistSI s >>= guard
   msum
@@ -108,7 +118,7 @@ exactFile = do
   
 depFile :: HasPathHandler r => Eff r ()
 depFile = do
-  d@Resource{..} <- get
+  d@Resource{..} <- ask
   let s = Resource{..}
   let df = s `addExt` "deps"
   ( do

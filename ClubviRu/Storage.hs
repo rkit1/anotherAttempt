@@ -19,33 +19,7 @@ import Control.Exception.Lifted
 import Control.Monad.Trans.Control
 import Control.Monad.Base
 import Control.Eff
-
-newtype AcidDepDB m a = AcidDepDB { unAcidDepDB :: ReaderT (AcidState DB) m a}
-  deriving (Monad, MonadTrans, MonadIO)
-
-instance MonadBaseControl b m => MonadBaseControl b (AcidDepDB m) where
-  newtype StM (AcidDepDB m) a
-    = StMAcidDepDB {unStMAcidDepDB :: ComposeSt AcidDepDB m a}
-  liftBaseWith = defaultLiftBaseWith StMAcidDepDB
-  restoreM     = defaultRestoreM   unStMAcidDepDB
-
-instance MonadBase b m => MonadBase b (AcidDepDB m) where
-  liftBase = liftBaseDefault
-
-instance MonadTransControl AcidDepDB where
-     newtype StT AcidDepDB a = StAcidDepDB {unStAcidDepDB :: StT (ReaderT (AcidState DB)) a}
-     liftWith = defaultLiftWith AcidDepDB unAcidDepDB StAcidDepDB
-     restoreT = defaultRestoreT AcidDepDB unStAcidDepDB
-
-instance Monad m => Functor (AcidDepDB m) where
-  fmap = liftM
-
-instance Monad m => Applicative (AcidDepDB m) where
-  pure = return
-  a <*> b = do
-    f <- a
-    arg <- b
-    return $ f arg
+import Control.Eff.Lift
 
 recordDeps_ :: DP -> Either String (UTCTime, S.Set SP, S.Set DP) -> Update DB ()
 recordDeps_ di dt = do
@@ -75,15 +49,13 @@ $(deriveSafeCopy 0 'base ''Resource)
 $(deriveSafeCopy 0 'base ''DB)
 $(makeAcidic ''DB ['recordDeps_, 'lookupDeps_, 'dumpDB])
 
-runAcidDepDB :: ( MonadBaseControl IO (Eff r), MonadIO (Eff r), HasSiteConfig r)
-  => Eff (DepDB SP DP UTCTime :> r) b -> Eff r b
-runAcidDepDB m = storeRoot >>= f
+runAcidDepDB
+  :: FilePath -> Eff (DepDB SP DP UTCTime :> (Lift IO :> ())) a -> IO a
+runAcidDepDB storeRoot m = bracket
+  (openLocalStateFrom (storeRoot ++ "/deps/") $ DB M.empty)
+  (\ db -> createCheckpoint db >> closeAcidState db)
+  $ runLift . g
   where
-    f path = liftBaseOp
-      (bracket
-       (openLocalStateFrom (path ++ "/deps/") $ DB M.empty)
-       (\ db -> createCheckpoint db >> closeAcidState db))
-      g
     g st = loop $ admin m
       where
         loop (Val e) = return e

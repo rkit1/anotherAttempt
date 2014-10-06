@@ -9,13 +9,14 @@ import SiteGen.Main
 import Data.Time.Clock
 import qualified Data.Map as M
 import ClubviRu.Config.Site
-import Control.Monad.Trans
 import ClubviRu.Storage
 import System.IO
+import Control.Eff.Lift
 
 main :: IO ()
 main = do
-  runClubviRu $ runAcidDepDB $ process (S.fromList ["/index.htm"])
+  p <- runLift $ runClubviRu storeRoot -- FIXME
+  runAcidDepDB p $ runClubviRu $  process (S.fromList ["/index.htm"])
     $ runDepRecordAndReport $ \ d -> do
       r <- runPathHandler d clubviRoute
       case r of

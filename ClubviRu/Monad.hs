@@ -50,7 +50,7 @@ runClubviRu m = runReader (loop $ admin m) config
           fp <- toFilePathM si
           res <- liftIO $ doesFileExist fp
           loop $ k res
-        f (CopySIToDI si di k) = do
+        f (CopySItoDI si di k) = do
           fps <- toFilePathM si
           fpd <- toFilePathM di
           res <- liftIO $ do
